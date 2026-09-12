@@ -11,15 +11,19 @@ namespace MDMS.Application.MeterData;
 /// "four real bugs" section): the last-known cumulative reading per meter is tracked across
 /// the whole in-flight batch, not just already-saved rows, so two blocks for the same meter in
 /// one request cannot both incorrectly come back Valid when the second is actually a
-/// negative-consumption event.
+/// negative-consumption event. Also applies <see cref="OutOfRangeValidationService"/>'s
+/// plausibility check inline, so an implausible reading is flagged the moment it arrives rather
+/// than only on the next on-demand sweep.
 /// </summary>
 public class LoadSurveyIngestionService
 {
     private readonly IMdmsDbContext _db;
+    private readonly OutOfRangeValidationService _outOfRangeValidationService;
 
-    public LoadSurveyIngestionService(IMdmsDbContext db)
+    public LoadSurveyIngestionService(IMdmsDbContext db, OutOfRangeValidationService outOfRangeValidationService)
     {
         _db = db;
+        _outOfRangeValidationService = outOfRangeValidationService;
     }
 
     public async Task<IReadOnlyList<LoadSurveyIngestResult>> IngestAsync(
@@ -29,14 +33,21 @@ public class LoadSurveyIngestionService
 
         // Seed "last known cumulative reading per meter" from persisted data, then keep it
         // updated in-memory as this batch is processed — never re-querying only saved rows.
+        // Deliberately excludes only NegativeConsumption (the one quality whose CumulativeReading
+        // is untrusted) — an OutOfRange interval's reading is still a trustworthy sequence anchor,
+        // only its consumption delta was implausible.
         var meterIds = requests.Select(r => r.MeterId).Distinct().ToList();
         var lastReadingByMeter = await _db.LoadSurveyIntervals
-            .Where(i => meterIds.Contains(i.MeterId) && i.Quality == MeasurementQuality.Valid)
+            .Where(i => meterIds.Contains(i.MeterId) && i.Quality != MeasurementQuality.NegativeConsumption)
             .GroupBy(i => i.MeterId)
             .Select(g => new { MeterId = g.Key, Last = g.OrderByDescending(i => i.IntervalEndUtc).First() })
             .ToDictionaryAsync(x => x.MeterId, x => x.Last.CumulativeReading, cancellationToken);
 
         var seenInBatch = new HashSet<(Guid MeterId, DateTime Start, DateTime End)>();
+
+        // Cached per meter for the duration of this batch — thresholds don't change mid-request,
+        // so there is no need to re-resolve the effective one for every interval of the same meter.
+        var thresholdByMeter = new Dictionary<Guid, MeasurementRangeThreshold?>();
 
         foreach (var request in requests.OrderBy(r => r.IntervalStartUtc))
         {
@@ -79,6 +90,19 @@ public class LoadSurveyIngestionService
             var valid = LoadSurveyInterval.CreateValid(
                 request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
                 request.CumulativeReading, consumption, MeasurementSource.Received);
+
+            if (!thresholdByMeter.TryGetValue(request.MeterId, out var threshold))
+            {
+                threshold = await _outOfRangeValidationService.GetEffectiveThresholdAsync(
+                    request.MeterId, cancellationToken);
+                thresholdByMeter[request.MeterId] = threshold;
+            }
+
+            // Out-of-range is a plausibility flag, not a sequence break: the cumulative reading
+            // itself is trusted and still advances the sequence for the next interval — unlike a
+            // negative-consumption rejection, it never raises a DataQualityHold on its own.
+            if (threshold is not null && !threshold.IsWithinRange(consumption))
+                valid.FlagOutOfRange();
 
             _db.LoadSurveyIntervals.Add(valid);
             lastReadingByMeter[request.MeterId] = request.CumulativeReading;

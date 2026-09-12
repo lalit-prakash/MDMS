@@ -18,6 +18,8 @@ public static class DependencyInjection
         services.AddScoped<IMdmsDbContext>(sp => sp.GetRequiredService<MdmsDbContext>());
 
         services.AddScoped<LoadSurveyIngestionService>();
+        services.AddScoped<DailyLoadProfileIngestionService>();
+        services.AddScoped<OutOfRangeValidationService>();
 
         return services;
     }

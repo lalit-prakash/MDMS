@@ -15,6 +15,7 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<LoadSurveyInterval> LoadSurveyIntervals => Set<LoadSurveyInterval>();
     public DbSet<DailyLoadProfile> DailyLoadProfiles => Set<DailyLoadProfile>();
     public DbSet<DataQualityHold> DataQualityHolds => Set<DataQualityHold>();
+    public DbSet<MeasurementRangeThreshold> MeasurementRangeThresholds => Set<MeasurementRangeThreshold>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
