@@ -51,6 +51,19 @@ public class DailyLoadProfile : Entity
             Quality = MeasurementQuality.Missing
         };
 
+    /// <summary>
+    /// Flags an already-stored Valid profile as out of a configured plausibility range. Never
+    /// changes <see cref="ConsumptionKwh"/> — only the quality annotation — mirroring
+    /// <see cref="LoadSurveyInterval.FlagOutOfRange"/>.
+    /// </summary>
+    public void FlagOutOfRange()
+    {
+        if (Quality != MeasurementQuality.Valid)
+            throw new InvalidOperationException($"Only a Valid profile can be flagged out of range (was {Quality}).");
+
+        Quality = MeasurementQuality.OutOfRange;
+    }
+
     /// <summary>Replaces a provisional profile once the real DLP arrives. Never mutates a Received profile.</summary>
     public DailyLoadProfile ReplaceWithReceived(decimal consumptionKwh)
     {

@@ -94,7 +94,7 @@ public class LoadSurveyIngestionService
             if (!thresholdByMeter.TryGetValue(request.MeterId, out var threshold))
             {
                 threshold = await _outOfRangeValidationService.GetEffectiveThresholdAsync(
-                    request.MeterId, cancellationToken);
+                    request.MeterId, MeasurementRangeType.LoadSurveyInterval, cancellationToken);
                 thresholdByMeter[request.MeterId] = threshold;
             }
 

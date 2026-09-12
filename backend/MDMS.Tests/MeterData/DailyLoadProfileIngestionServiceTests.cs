@@ -20,7 +20,7 @@ public class DailyLoadProfileIngestionServiceTests
     public async Task IngestAsync_NoExistingProfile_CreatesReceivedProfile()
     {
         await using var db = CreateContext();
-        var service = new DailyLoadProfileIngestionService(db);
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
         var servicePointId = Guid.NewGuid();
         var meterId = Guid.NewGuid();
         var date = new DateOnly(2026, 1, 1);
@@ -47,7 +47,7 @@ public class DailyLoadProfileIngestionServiceTests
         db.DailyLoadProfiles.Add(DailyLoadProfile.CreateProvisional(servicePointId, meterId, date, 10m));
         await db.SaveChangesAsync();
 
-        var service = new DailyLoadProfileIngestionService(db);
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
         var result = await service.IngestAsync(
             new DailyLoadProfileIngestRequest(servicePointId, meterId, date, 37m));
 
@@ -72,12 +72,64 @@ public class DailyLoadProfileIngestionServiceTests
         db.DailyLoadProfiles.Add(DailyLoadProfile.CreateReceived(servicePointId, meterId, date, 50m));
         await db.SaveChangesAsync();
 
-        var service = new DailyLoadProfileIngestionService(db);
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.IngestAsync(new DailyLoadProfileIngestRequest(servicePointId, meterId, date, 999m)));
 
         var stored = await db.DailyLoadProfiles.SingleAsync();
         Assert.Equal(50m, stored.ConsumptionKwh);
+    }
+
+    [Fact]
+    public async Task IngestAsync_ConsumptionAboveConfiguredThreshold_IsFlaggedOutOfRangeInline()
+    {
+        await using var db = CreateContext();
+        var servicePointId = Guid.NewGuid();
+        var meterId = Guid.NewGuid();
+        var date = new DateOnly(2026, 1, 1);
+
+        db.MeasurementRangeThresholds.Add(
+            new MeasurementRangeThreshold(MeasurementRangeType.DailyLoadProfile, meterId, 0m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
+        var result = await service.IngestAsync(
+            new DailyLoadProfileIngestRequest(servicePointId, meterId, date, 500m));
+
+        Assert.Equal(MeasurementQuality.OutOfRange, result.Quality);
+        var stored = await db.DailyLoadProfiles.SingleAsync();
+        Assert.Equal(MeasurementQuality.OutOfRange, stored.Quality);
+        Assert.Equal(500m, stored.ConsumptionKwh); // the value itself is never altered
+    }
+
+    [Fact]
+    public async Task IngestAsync_NoThresholdConfigured_NeverFlagsOutOfRange()
+    {
+        await using var db = CreateContext();
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
+
+        var result = await service.IngestAsync(
+            new DailyLoadProfileIngestRequest(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), 1_000_000m));
+
+        Assert.Equal(MeasurementQuality.Valid, result.Quality);
+    }
+
+    [Fact]
+    public async Task IngestAsync_LsThresholdDoesNotApplyToDlp()
+    {
+        // An LS threshold configured for the same meter must never leak into DLP evaluation —
+        // the two measurement types are looked up independently via MeasurementRangeType.
+        await using var db = CreateContext();
+        var meterId = Guid.NewGuid();
+        db.MeasurementRangeThresholds.Add(
+            new MeasurementRangeThreshold(MeasurementRangeType.LoadSurveyInterval, meterId, 0m, 10m));
+        await db.SaveChangesAsync();
+
+        var service = new DailyLoadProfileIngestionService(db, new OutOfRangeValidationService(db));
+        var result = await service.IngestAsync(
+            new DailyLoadProfileIngestRequest(Guid.NewGuid(), meterId, new DateOnly(2026, 1, 1), 500m));
+
+        Assert.Equal(MeasurementQuality.Valid, result.Quality);
     }
 }
