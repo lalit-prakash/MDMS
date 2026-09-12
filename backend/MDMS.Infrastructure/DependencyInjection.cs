@@ -19,6 +19,7 @@ public static class DependencyInjection
 
         services.AddScoped<LoadSurveyIngestionService>();
         services.AddScoped<DailyLoadProfileIngestionService>();
+        services.AddScoped<OutOfRangeValidationService>();
 
         return services;
     }

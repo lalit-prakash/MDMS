@@ -11,9 +11,10 @@ that is `prepaid_engine`'s responsibility and stays there. See
 [Compatibility & boundary](#compatibility--boundary-with-prepaid_engine) below.
 
 **Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
-/ negative-consumption detection and data-quality holds, meter master data with a temporal
-installation/replacement history, an initial EF Core migration, and 6 passing unit tests. No
-frontend yet. This is a first vertical slice, not a complete MDMS.
+/ negative-consumption detection and data-quality holds, Daily Load Profile ingestion, a
+configurable out-of-range VEE check, meter master data with a temporal installation/replacement
+history, EF Core migrations, and 19 passing unit tests. No frontend yet. This is a first vertical
+slice, not a complete MDMS.
 
 ## Structure
 
@@ -42,6 +43,7 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
 | `LoadSurveyInterval` | One 30-minute LS block — shape mirrors `prepaid_engine`'s own entity of the same name so the eventual integration is a near-direct mapping. Carries explicit `Source` (Received/Estimated/Edited/Calculated) and `Quality` (Valid/NegativeConsumption/...) |
 | `DailyLoadProfile` | The meter's daily profile at the 00:00 boundary, with a provisional/estimated path for a missing day — mirrors `prepaid_engine`'s DLP shape |
 | `DataQualityHold` | An active hold blocking further processing for a meter after a data-quality event (e.g. negative consumption) — equivalent in spirit to `prepaid_engine`'s `MeterBillingControl`, renamed since this is about measurement validity, not billing |
+| `MeasurementRangeThreshold` | A configurable min/max plausibility range for LS consumption — global default (`MeterId == null`) or meter-specific override. Configuration, not a hard-coded constant, per MDMS's stated principles |
 
 ### Load Survey ingestion
 
@@ -71,6 +73,25 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
   `Received` one; the provisional row is not left behind.
 - An existing **`Received`** profile for that key → rejected (`409 Conflict`) rather than
   overwritten — a genuine received value is never silently replaced.
+
+### Out-of-range VEE checks
+
+`OutOfRangeValidationService` is the second VEE check (alongside LS ingestion's inline
+negative-consumption detection): a configurable plausibility range for LS consumption, checked
+on demand rather than only at ingestion time so a threshold added/corrected later can be applied
+retroactively to already-stored data.
+
+- A meter-specific `MeasurementRangeThreshold` takes precedence over the global default
+  (`MeterId == null`); a meter with neither configured is never flagged — no threshold means no
+  opinion, not a false positive.
+- `RunCheckAsync` re-evaluates every currently-`Valid` LS interval for a meter (or every meter
+  with a configured threshold, if no meter is specified) and flags any breach `OutOfRange` via
+  `LoadSurveyInterval.FlagOutOfRange()` — the consumption value itself is never altered, only the
+  quality annotation, so a later re-check after a threshold correction isn't comparing against an
+  already-mutated number.
+- Not yet wired into `LoadSurveyIngestionService`'s inline ingestion path — today it runs only via
+  its own endpoint (see below), not automatically on every ingest. Also LS-only for now; DLP
+  out-of-range checking is a documented gap (see "Not yet built").
 
 ## Compatibility & boundary with prepaid_engine
 
@@ -149,6 +170,9 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `GET /api/v1/meter-data/dlp?meterId=` | Recent Daily Load Profiles (capped at 500), optionally filtered by meter |
 | `GET /api/v1/meter-data/billing-holds?activeOnly=` | Data-quality holds |
 | `POST /api/v1/meter-data/{meterId}/billing-hold/clear` | Clear an active hold with a mandatory resolution note |
+| `GET /api/v1/vee/thresholds` | List configured out-of-range thresholds (global default first) |
+| `POST /api/v1/vee/thresholds` | Configure a plausibility threshold — global (`meterId: null`) or meter-specific |
+| `POST /api/v1/vee/out-of-range-checks/run?meterId=` | Re-evaluate stored LS intervals against their effective threshold, flagging breaches `OutOfRange`; omit `meterId` to sweep every meter with a configured threshold |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -161,16 +185,21 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**9 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**19 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
-regression, idempotency (duplicate-in-batch and already-persisted duplicate), and DLP ingestion
-(new profile, provisional replacement, and rejecting an overwrite of a received profile).
+regression, idempotency (duplicate-in-batch and already-persisted duplicate), DLP ingestion (new
+profile, provisional replacement, rejecting an overwrite of a received profile), out-of-range
+threshold resolution (meter-specific vs. global vs. unconfigured), and the out-of-range check
+itself (flagging a breach without mutating the underlying value, ignoring meters with no
+threshold, and sweeping every thresholded meter when none is specified).
 
 ## Not yet built
 
 - Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
   first" preference.
-- A real VEE rules engine beyond negative-consumption detection (out-of-range checks, estimation
+- Out-of-range checking is not run automatically at ingestion time (only on demand via its
+  endpoint) and does not yet cover DLP, only LS.
+- A fuller VEE rules engine beyond negative-consumption + out-of-range checks (estimation
   scheduling, provisional-DLP auto-creation when a day's profile never arrives).
 - The `IMeterDataClient`-style integration port on the `prepaid_engine` side.
 - Authentication/authorization.

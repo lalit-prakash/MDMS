@@ -17,6 +17,7 @@ public interface IMdmsDbContext
     DbSet<LoadSurveyInterval> LoadSurveyIntervals { get; }
     DbSet<DailyLoadProfile> DailyLoadProfiles { get; }
     DbSet<DataQualityHold> DataQualityHolds { get; }
+    DbSet<MeasurementRangeThreshold> MeasurementRangeThresholds { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

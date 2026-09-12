@@ -52,6 +52,20 @@ public class LoadSurveyInterval : Entity
         };
     }
 
+    /// <summary>
+    /// Flags an already-stored Valid interval as out of a configured plausibility range. Never
+    /// changes <see cref="ConsumptionKwh"/> or <see cref="CumulativeReading"/> — only the quality
+    /// annotation — so the underlying measurement stays intact for audit and a later re-check
+    /// (e.g. after a threshold correction) is not comparing against an already-mutated value.
+    /// </summary>
+    public void FlagOutOfRange()
+    {
+        if (Quality != MeasurementQuality.Valid)
+            throw new InvalidOperationException($"Only a Valid interval can be flagged out of range (was {Quality}).");
+
+        Quality = MeasurementQuality.OutOfRange;
+    }
+
     public static LoadSurveyInterval CreateRejected(
         Guid meterId, DateTime intervalStartUtc, DateTime intervalEndUtc,
         decimal cumulativeReading, MeasurementQuality quality)
