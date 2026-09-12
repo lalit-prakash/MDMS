@@ -23,6 +23,7 @@ public interface IMdmsDbContext
     DbSet<HierarchyNode> HierarchyNodes { get; }
     DbSet<OrgUnit> OrgUnits { get; }
     DbSet<User> Users { get; }
+    DbSet<VeeExecutionRecord> VeeExecutionRecords { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

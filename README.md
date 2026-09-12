@@ -71,6 +71,7 @@ calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 | `HierarchyNode` | One node of the **electrical** hierarchy — Substation → Feeder → Distribution Transformer — that energy-audit aggregation will roll up through. A single self-referencing tree, level enforced by `NodeType`. A `ServicePoint` links to a DT node to complete the chain to the consumer |
 | `OrgUnit` | One node of the **organizational** hierarchy — Zone → Circle → Division → Sub Division → Section — used for RBAC scoping, dashboards, and work assignment. Deliberately a separate tree from `HierarchyNode`; the two never share levels or nodes |
 | `User` | A named user with a fixed `Role` (12 roles: Admin, ItManager, Nomc, Supervisor, QualityIncharge, OmSupervisor, Installer, OmExecutive, Contractor, UtilityManager, ComplaintDesk, StoreManager) and an `OrgUnitId` scope (required for every role except Admin). **Data only** — no login/credentials/permission enforcement exists yet |
+| `VeeExecutionRecord` | An immutable audit entry for one VEE rule execution against one measurement slot — rule name, outcome, estimated value if any, and a human-readable explanation. VEE's own audit trail |
 
 ### Load Survey ingestion
 
@@ -133,6 +134,20 @@ threshold configured for one type is never consulted for the other).
   on the subclass — so a future config screen can list every rule of every type in one query, and
   a future rule type (continuity, missing-interval estimation) is a new subclass, not a rewrite of
   this one. `IsActive` is enforced: a deactivated threshold is treated exactly like no threshold.
+
+### Missing-interval estimation
+
+`MissingIntervalEstimationService` covers the completeness/estimation half of VEE: a day has 48
+expected 30-minute LS slots (`ExpectedSlots`), and `DetectMissingSlotsAsync` finds any with no
+`LoadSurveyInterval` row at all. `EstimateMissingSlotsAsync` estimates a gap only when both
+immediate neighbors (the interval ending exactly at the slot's start, and the one starting exactly
+at its end) exist and are `Valid`, using the "average of surrounding periods" method — one of the
+estimation approaches this project's spec allows. A slot without both usable neighbors is never
+guessed at or treated as zero consumption; it stays missing. **Every attempt is recorded** as a
+`VeeExecutionRecord` (rule name, slot, outcome, estimated value if any, and a human-readable
+explanation) — VEE's own audit trail, independent of and in addition to `DataQualityHold`.
+`GET /api/v1/vee/estimation/ls/missing-slots` and `POST /api/v1/vee/estimation/ls/run` expose this;
+`GET /api/v1/vee/execution-records` exposes the audit trail itself.
 
 ### Config module
 
@@ -215,6 +230,9 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `POST /api/v1/vee/thresholds` | Configure a plausibility threshold for a `measurementType` (`LoadSurveyInterval` or `DailyLoadProfile`) — global (`meterId: null`) or meter-specific |
 | `POST /api/v1/vee/out-of-range-checks/ls/run?meterId=` | Re-evaluate stored LS intervals against their effective threshold, flagging breaches `OutOfRange`; omit `meterId` to sweep every meter with a configured LS threshold |
 | `POST /api/v1/vee/out-of-range-checks/dlp/run?meterId=` | Same, for Daily Load Profiles |
+| `GET /api/v1/vee/estimation/ls/missing-slots?meterId=&date=` | List the day's missing 30-min LS slots for a meter (detection only) |
+| `POST /api/v1/vee/estimation/ls/run?meterId=&date=` | Estimate missing LS slots via average-of-neighbors where possible; returns the audit trail |
+| `GET /api/v1/vee/execution-records?meterId=` | The VEE audit trail (every rule execution recorded) |
 | `GET /api/v1/config/tariff-categories` / `POST /api/v1/config/tariff-categories` | List / create tariff category reference data |
 | `GET /api/v1/config/hierarchy?nodeType=` | List electrical hierarchy nodes (Substation/Feeder/DT), optionally filtered by level |
 | `GET /api/v1/config/hierarchy/{id}/children` | List a node's direct children |
@@ -237,7 +255,7 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**49 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**56 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
@@ -248,16 +266,17 @@ independently and never leak into each other), the on-demand out-of-range check 
 DLP, the `VeeRuleDefinition`/`MeasurementRangeThreshold` table-per-hierarchy round-trip (including
 that a deactivated rule is no longer the effective one), tenant-default assignment, tariff
 category validation, electrical-hierarchy-level enforcement, organizational-hierarchy-level
-enforcement, `ServicePoint`-to-DT-node linking, and `User` role/org-scope validation (every
-non-Admin role requires an org unit).
+enforcement, `ServicePoint`-to-DT-node linking, `User` role/org-scope validation (every non-Admin
+role requires an org unit), missing-slot detection, and missing-interval estimation (both the
+successful average-of-neighbors case and the "never guess without both neighbors" case).
 
 ## Not yet built
 
 - Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
   first" preference.
-- A fuller VEE rules engine beyond negative-consumption + out-of-range checks (timestamp/interval-
-  completeness validation, sequence checks beyond negative-consumption, interpolation/estimation,
-  provisional-DLP auto-creation when a day's profile never arrives).
+- A fuller VEE rules engine beyond negative-consumption, out-of-range, and average-of-neighbors
+  missing-interval estimation (explicit timestamp/boundary validation, DLP-side missing-day
+  estimation, provisional-DLP auto-creation, duplicate-message detection).
 - `energy-audit` module: Substation/feeder/DT aggregation and loss computation (real-loss vs.
   coverage-loss split) on top of the `HierarchyNode` tree and `ServicePoint.DistributionTransformerNodeId`
   link that now exist.
