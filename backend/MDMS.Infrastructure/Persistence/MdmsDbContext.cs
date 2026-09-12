@@ -25,6 +25,8 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<VeeExecutionRecord> VeeExecutionRecords => Set<VeeExecutionRecord>();
     public DbSet<NetworkEnergyReading> NetworkEnergyReadings => Set<NetworkEnergyReading>();
     public DbSet<Complaint> Complaints => Set<Complaint>();
+    public DbSet<MeterInventoryRecord> MeterInventoryRecords => Set<MeterInventoryRecord>();
+    public DbSet<InstallationQualityCheck> InstallationQualityChecks => Set<InstallationQualityCheck>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
