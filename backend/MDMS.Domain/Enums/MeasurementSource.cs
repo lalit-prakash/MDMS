@@ -1,9 +1,9 @@
 namespace MDMS.Domain.Enums;
 
 /// <summary>
-/// How a measurement value came to exist. Explicit and never inferred — a downstream
-/// consumer (e.g. prepaid_engine's billing pipeline) must be able to tell a genuine
-/// meter-reported value from one this system produced on the meter's behalf.
+/// How a measurement value came to exist. Explicit and never inferred — any downstream consumer
+/// must be able to tell a genuine meter-reported value from one this system produced on the
+/// meter's behalf.
 /// </summary>
 public enum MeasurementSource
 {

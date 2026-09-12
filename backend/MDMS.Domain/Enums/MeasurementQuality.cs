@@ -1,10 +1,8 @@
 namespace MDMS.Domain.Enums;
 
 /// <summary>
-/// VEE (Validation/Estimation/Editing) outcome for a measurement. Mirrors the intent of
-/// prepaid_engine's <c>LoadSurveyQuality</c> (which currently only distinguishes
-/// Valid/NegativeConsumption) but is broadened here since VEE is MDMS's responsibility,
-/// not the billing engine's.
+/// VEE (Validation/Estimation/Editing) outcome for a measurement — VEE is MDMS's own
+/// responsibility, not any downstream billing system's.
 /// </summary>
 public enum MeasurementQuality
 {

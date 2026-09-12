@@ -5,11 +5,11 @@ namespace MDMS.Application.Common;
 
 /// <summary>
 /// The persistence seam the Application layer depends on, implemented by Infrastructure's
-/// EF Core <c>MdmsDbContext</c>. Keeps Application free of a direct EF Core/Npgsql dependency,
-/// matching prepaid_engine's own layering discipline.
+/// EF Core <c>MdmsDbContext</c>. Keeps Application free of a direct EF Core/Npgsql dependency.
 /// </summary>
 public interface IMdmsDbContext
 {
+    DbSet<Tenant> Tenants { get; }
     DbSet<Customer> Customers { get; }
     DbSet<ServicePoint> ServicePoints { get; }
     DbSet<Meter> Meters { get; }
@@ -17,7 +17,12 @@ public interface IMdmsDbContext
     DbSet<LoadSurveyInterval> LoadSurveyIntervals { get; }
     DbSet<DailyLoadProfile> DailyLoadProfiles { get; }
     DbSet<DataQualityHold> DataQualityHolds { get; }
+    DbSet<VeeRuleDefinition> VeeRuleDefinitions { get; }
     DbSet<MeasurementRangeThreshold> MeasurementRangeThresholds { get; }
+    DbSet<TariffCategory> TariffCategories { get; }
+    DbSet<HierarchyNode> HierarchyNodes { get; }
+    DbSet<OrgUnit> OrgUnits { get; }
+    DbSet<User> Users { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

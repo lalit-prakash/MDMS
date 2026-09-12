@@ -15,7 +15,8 @@ public class LoadSurveyIntervalConfiguration : IEntityTypeConfiguration<LoadSurv
         builder.Property(i => i.CumulativeReading).HasColumnType("numeric(18,4)");
         builder.Property(i => i.ConsumptionKwh).HasColumnType("numeric(18,4)");
 
-        // Unique per meter + interval, DB-enforced idempotency — mirrors prepaid_engine.
+        // Unique per meter + interval — DB-enforced idempotency, a second layer atop the
+        // ingestion service's own in-batch duplicate check.
         builder.HasIndex(i => new { i.MeterId, i.IntervalStartUtc, i.IntervalEndUtc }).IsUnique();
     }
 }

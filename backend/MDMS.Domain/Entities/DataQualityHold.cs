@@ -4,10 +4,9 @@ namespace MDMS.Domain.Entities;
 
 /// <summary>
 /// An active hold blocking further measurement processing for one meter after a data-quality
-/// event (e.g. negative consumption) is detected — mirrors prepaid_engine's
-/// <c>MeterBillingControl</c> concept, renamed since MDMS's hold is about measurement
-/// processing/VEE, not billing itself. Downstream consumers (prepaid_engine) should treat a
-/// meter with an active hold as having no trustworthy new usage data yet.
+/// event (e.g. negative consumption) is detected. This is about measurement processing/VEE, not
+/// billing — any downstream consumer of this data should treat a meter with an active hold as
+/// having no trustworthy new usage data yet.
 /// </summary>
 public class DataQualityHold : Entity
 {

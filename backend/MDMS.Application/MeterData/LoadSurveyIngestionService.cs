@@ -6,12 +6,11 @@ using Microsoft.EntityFrameworkCore;
 namespace MDMS.Application.MeterData;
 
 /// <summary>
-/// Validates and stores incoming Load Survey blocks. Applies the same sequence-continuity
-/// discipline prepaid_engine's own LS ingestion learned the hard way (see its README's
-/// "four real bugs" section): the last-known cumulative reading per meter is tracked across
-/// the whole in-flight batch, not just already-saved rows, so two blocks for the same meter in
-/// one request cannot both incorrectly come back Valid when the second is actually a
-/// negative-consumption event. Also applies <see cref="OutOfRangeValidationService"/>'s
+/// Validates and stores incoming Load Survey blocks, applying strict sequence-continuity
+/// discipline: the last-known cumulative reading per meter is tracked across the whole
+/// in-flight batch, not just already-saved rows, so two blocks for the same meter in one request
+/// cannot both incorrectly come back Valid when the second is actually a negative-consumption
+/// event. Also applies <see cref="OutOfRangeValidationService"/>'s
 /// plausibility check inline, so an implausible reading is flagged the moment it arrives rather
 /// than only on the next on-demand sweep.
 /// </summary>
