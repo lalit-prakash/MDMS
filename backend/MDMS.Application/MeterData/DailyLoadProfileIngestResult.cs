@@ -10,4 +10,5 @@ public record DailyLoadProfileIngestResult(
     DateOnly ProfileDate,
     decimal ConsumptionKwh,
     MeasurementSource Source,
+    MeasurementQuality Quality,
     bool ReplacedProvisional);

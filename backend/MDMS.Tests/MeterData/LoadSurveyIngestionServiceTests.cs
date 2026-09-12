@@ -141,7 +141,7 @@ public class LoadSurveyIngestionServiceTests
     {
         await using var db = CreateContext();
         var meterId = Guid.NewGuid();
-        db.MeasurementRangeThresholds.Add(new MeasurementRangeThreshold(meterId, 0m, 50m));
+        db.MeasurementRangeThresholds.Add(new MeasurementRangeThreshold(MeasurementRangeType.LoadSurveyInterval, meterId, 0m, 50m));
         await db.SaveChangesAsync();
 
         var service = new LoadSurveyIngestionService(db, new OutOfRangeValidationService(db));
