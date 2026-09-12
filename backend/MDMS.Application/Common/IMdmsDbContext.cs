@@ -24,6 +24,7 @@ public interface IMdmsDbContext
     DbSet<OrgUnit> OrgUnits { get; }
     DbSet<User> Users { get; }
     DbSet<VeeExecutionRecord> VeeExecutionRecords { get; }
+    DbSet<NetworkEnergyReading> NetworkEnergyReadings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

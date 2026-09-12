@@ -1,4 +1,5 @@
 using MDMS.Application.Common;
+using MDMS.Application.EnergyAudit;
 using MDMS.Application.MeterData;
 using MDMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<DailyLoadProfileIngestionService>();
         services.AddScoped<OutOfRangeValidationService>();
         services.AddScoped<MissingIntervalEstimationService>();
+        services.AddScoped<EnergyAuditService>();
 
         return services;
     }

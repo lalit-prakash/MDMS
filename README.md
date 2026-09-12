@@ -19,10 +19,11 @@ complaints/ticketing are all planned but not yet built (see "Not yet built").
 out-of-range checks and missing-interval estimation with an audit trail, meter master data with a
 temporal installation/replacement history, a `config` module (tariff categories, the electrical
 hierarchy, the organizational hierarchy), user/role records (data only, no auth/enforcement yet),
-tenant scoping on every table, EF Core migrations, and 56 passing backend unit tests — plus a first
-working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with one page per backend
-module. No auth, no billing module yet on either side. This is an early vertical slice, not a
-complete MDMS.
+a first `energy-audit` module (transparent supply-vs-consumption balance, no automated real-loss/
+coverage-loss split), tenant scoping on every table, EF Core migrations, and 64 passing backend
+unit tests — plus a first working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with
+one page per backend module. No auth, no billing module yet on either side. This is an early
+vertical slice, not a complete MDMS.
 
 ## Structure
 
@@ -35,8 +36,8 @@ complete MDMS.
   - `MDMS.Tests` — xUnit tests (EF Core InMemory provider)
 
 Modules are organized as folders/namespaces within these four projects rather than separate
-projects or services — a modular monolith. `MeterData` (ingestion + VEE) and `Config` (reference
-data) are the two modules so far; `energy-audit`, `billing`, `wfm`, and `complaints` are planned
+projects or services — a modular monolith. `MeterData` (ingestion + VEE), `Config` (reference
+data), and `EnergyAudit` are the modules so far; `billing`, `wfm`, and `complaints` are planned
 the same way (see "Not yet built").
 
 **Target framework note**: the target stack is .NET 10, but only the .NET 8 SDK is available in
@@ -73,6 +74,7 @@ calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 | `OrgUnit` | One node of the **organizational** hierarchy — Zone → Circle → Division → Sub Division → Section — used for RBAC scoping, dashboards, and work assignment. Deliberately a separate tree from `HierarchyNode`; the two never share levels or nodes |
 | `User` | A named user with a fixed `Role` (12 roles: Admin, ItManager, Nomc, Supervisor, QualityIncharge, OmSupervisor, Installer, OmExecutive, Contractor, UtilityManager, ComplaintDesk, StoreManager) and an `OrgUnitId` scope (required for every role except Admin). **Data only** — no login/credentials/permission enforcement exists yet |
 | `VeeExecutionRecord` | An immutable audit entry for one VEE rule execution against one measurement slot — rule name, outcome, estimated value if any, and a human-readable explanation. VEE's own audit trail |
+| `NetworkEnergyReading` | The supply-side energy that entered one `HierarchyNode` (Substation/Feeder/DT) on one day — entered directly today, since there's no feeder/DTR meter ingestion pipeline yet |
 
 ### Load Survey ingestion
 
@@ -149,6 +151,26 @@ guessed at or treated as zero consumption; it stays missing. **Every attempt is 
 explanation) — VEE's own audit trail, independent of and in addition to `DataQualityHold`.
 `GET /api/v1/vee/estimation/ls/missing-slots` and `POST /api/v1/vee/estimation/ls/run` expose this;
 `GET /api/v1/vee/execution-records` exposes the audit trail itself.
+
+### Energy audit
+
+`EnergyAuditService` compares energy entering a network level against energy accounted for
+downstream — deliberately **not** collapsed into a single "loss %". `ComputeDailyBalanceAsync`
+returns `EnergyBalanceResult`: the supply-side reading (if any), the summed downstream Daily Load
+Profile consumption for that day, the discrepancy, and — separately — data completeness (what
+fraction of linked service points actually reported a profile at all that day). The idea is that a
+reader can judge how much of a discrepancy is a genuine loss versus a data-coverage gap, rather
+than trusting an unjustified automated real-loss/coverage-loss split formula.
+
+- `GetDescendantDistributionTransformerIdsAsync` walks the `HierarchyNode` tree from any node down
+  to its DT descendants (or returns itself if already a DT) — a consumer only ever attaches at the
+  DT level via `ServicePoint.DistributionTransformerNodeId`, so this determines exactly which
+  consumers roll up under a Substation, Feeder, or DT balance calculation.
+- No feeder/DTR meter ingestion pipeline exists yet, so `NetworkEnergyReading` (the supply-side
+  figure) is entered directly via `POST /api/v1/energy-audit/network-energy-readings` rather than
+  derived from a real boundary meter feed.
+- `GET /api/v1/energy-audit/balance?hierarchyNodeId=&date=` exposes the full transparent
+  calculation.
 
 ### Config module
 
@@ -244,6 +266,9 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `GET /api/v1/users?role=` / `GET /api/v1/users/{id}` | List / get user records, optionally filtered by role |
 | `POST /api/v1/users` | Create a user (`role` + `orgUnitId`; every role except Admin requires an org unit) |
 | `POST /api/v1/users/{id}/reassign` | Change a user's role and/or org unit |
+| `POST /api/v1/energy-audit/network-energy-readings` | Record (or revise) a hierarchy node's supply-side energy for one day |
+| `GET /api/v1/energy-audit/network-energy-readings?hierarchyNodeId=` | List recorded network energy readings |
+| `GET /api/v1/energy-audit/balance?hierarchyNodeId=&date=` | The transparent energy balance for a node/day (input, accounted, discrepancy, data completeness) |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -256,7 +281,7 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**56 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**64 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
@@ -268,13 +293,15 @@ DLP, the `VeeRuleDefinition`/`MeasurementRangeThreshold` table-per-hierarchy rou
 that a deactivated rule is no longer the effective one), tenant-default assignment, tariff
 category validation, electrical-hierarchy-level enforcement, organizational-hierarchy-level
 enforcement, `ServicePoint`-to-DT-node linking, `User` role/org-scope validation (every non-Admin
-role requires an org unit), missing-slot detection, and missing-interval estimation (both the
-successful average-of-neighbors case and the "never guess without both neighbors" case).
+role requires an org unit), missing-slot detection, missing-interval estimation (both the
+successful average-of-neighbors case and the "never guess without both neighbors" case), hierarchy
+descendant-DT resolution from any level, and energy-balance calculation (discrepancy math, data
+completeness, and the no-reading-yet case).
 
 ## Frontend
 
 See [`frontend/README.md`](frontend/README.md) — Next.js + MUI + TanStack Query, one page per
-backend module (Meters, Meter Data, VEE, Config, Users). No auth, no charts yet, and no screens
+backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit). No auth, no charts yet, and no screens
 for modules that don't exist on the backend (energy audit, revenue protection, prepaid, WFM,
 complaints).
 
@@ -283,9 +310,10 @@ complaints).
 - A fuller VEE rules engine beyond negative-consumption, out-of-range, and average-of-neighbors
   missing-interval estimation (explicit timestamp/boundary validation, DLP-side missing-day
   estimation, provisional-DLP auto-creation, duplicate-message detection).
-- `energy-audit` module: Substation/feeder/DT aggregation and loss computation (real-loss vs.
-  coverage-loss split) on top of the `HierarchyNode` tree and `ServicePoint.DistributionTransformerNodeId`
-  link that now exist.
+- A real feeder/DTR meter ingestion pipeline for `NetworkEnergyReading` (entered manually today)
+  and an automated, justified real-loss vs. coverage-loss split (today's `energy-audit` module
+  reports the raw discrepancy and data-completeness transparently, but deliberately does not
+  attempt that split without a defensible formula).
 - `revenue-protection` module: anomaly signals, risk scoring, and lead workflow.
 - `prepaid` module: wallet/ledger, recharge idempotency, daily billing, disconnect/reconnect
   command workflow with confirmation (not just "sent").
