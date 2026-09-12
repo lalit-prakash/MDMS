@@ -13,7 +13,7 @@ that is `prepaid_engine`'s responsibility and stays there. See
 **Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
 / negative-consumption detection and data-quality holds, Daily Load Profile ingestion, a
 configurable out-of-range VEE check, meter master data with a temporal installation/replacement
-history, EF Core migrations, and 19 passing unit tests. No frontend yet. This is a first vertical
+history, EF Core migrations, and 21 passing unit tests. No frontend yet. This is a first vertical
 slice, not a complete MDMS.
 
 ## Structure
@@ -62,6 +62,9 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
   also enforces this uniquely as a second layer.
 - A bad item never fails the rest of the batch — matches `prepaid_engine`'s established batch
   pattern (see its conversions/billing-holds-clear-bulk endpoints).
+- Also runs the out-of-range plausibility check inline (see below) against each interval's
+  computed consumption before it's stored — an implausible reading is flagged the moment it
+  arrives, not only on the next on-demand sweep.
 
 ### Daily Load Profile ingestion
 
@@ -76,22 +79,27 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
 
 ### Out-of-range VEE checks
 
-`OutOfRangeValidationService` is the second VEE check (alongside LS ingestion's inline
-negative-consumption detection): a configurable plausibility range for LS consumption, checked
-on demand rather than only at ingestion time so a threshold added/corrected later can be applied
-retroactively to already-stored data.
+`OutOfRangeValidationService` is the second VEE check, alongside LS ingestion's inline
+negative-consumption detection — a configurable plausibility range for LS consumption.
 
 - A meter-specific `MeasurementRangeThreshold` takes precedence over the global default
   (`MeterId == null`); a meter with neither configured is never flagged — no threshold means no
   opinion, not a false positive.
-- `RunCheckAsync` re-evaluates every currently-`Valid` LS interval for a meter (or every meter
-  with a configured threshold, if no meter is specified) and flags any breach `OutOfRange` via
-  `LoadSurveyInterval.FlagOutOfRange()` — the consumption value itself is never altered, only the
-  quality annotation, so a later re-check after a threshold correction isn't comparing against an
-  already-mutated number.
-- Not yet wired into `LoadSurveyIngestionService`'s inline ingestion path — today it runs only via
-  its own endpoint (see below), not automatically on every ingest. Also LS-only for now; DLP
-  out-of-range checking is a documented gap (see "Not yet built").
+- **Runs inline during ingestion**: `LoadSurveyIngestionService` resolves the effective threshold
+  for each meter once per batch and flags a breaching interval `OutOfRange` via
+  `LoadSurveyInterval.FlagOutOfRange()` before it's ever stored as `Valid` — the consumption value
+  itself is never altered, only the quality annotation. An out-of-range interval is a plausibility
+  flag, not a sequence break: its `CumulativeReading` is still trusted as the anchor for the next
+  interval's delta, and it never raises a `DataQualityHold` on its own (unlike negative
+  consumption). The "last known reading" sequence-continuity query correspondingly treats
+  `OutOfRange` as trustworthy and only excludes `NegativeConsumption` rows — a real bug this
+  feature's own tests caught: an earlier version filtered to `Quality == Valid` only, which broke
+  continuity for the interval immediately after an out-of-range one.
+- **Also available on demand**: `POST /api/v1/vee/out-of-range-checks/run` re-evaluates every
+  currently-`Valid` LS interval for a meter (or every meter with a configured threshold, if none
+  is specified) — useful for retroactively applying a threshold added/corrected *after* data was
+  already ingested, which the inline check alone can't do.
+- LS-only for now; DLP has no out-of-range check yet (documented gap, see "Not yet built").
 
 ## Compatibility & boundary with prepaid_engine
 
@@ -185,11 +193,13 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**19 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**21 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
-regression, idempotency (duplicate-in-batch and already-persisted duplicate), DLP ingestion (new
-profile, provisional replacement, rejecting an overwrite of a received profile), out-of-range
-threshold resolution (meter-specific vs. global vs. unconfigured), and the out-of-range check
+regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
+flagging during ingestion (including that a flagged interval still anchors the next interval's
+sequence and never raises a hold), DLP ingestion (new profile, provisional replacement, rejecting
+an overwrite of a received profile), out-of-range threshold resolution (meter-specific vs. global
+vs. unconfigured), and the on-demand out-of-range check
 itself (flagging a breach without mutating the underlying value, ignoring meters with no
 threshold, and sweeping every thresholded meter when none is specified).
 
@@ -197,8 +207,7 @@ threshold, and sweeping every thresholded meter when none is specified).
 
 - Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
   first" preference.
-- Out-of-range checking is not run automatically at ingestion time (only on demand via its
-  endpoint) and does not yet cover DLP, only LS.
+- Out-of-range checking covers LS only, not DLP.
 - A fuller VEE rules engine beyond negative-consumption + out-of-range checks (estimation
   scheduling, provisional-DLP auto-creation when a day's profile never arrives).
 - The `IMeterDataClient`-style integration port on the `prepaid_engine` side.
