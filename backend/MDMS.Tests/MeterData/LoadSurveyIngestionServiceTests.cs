@@ -87,9 +87,8 @@ public class LoadSurveyIngestionServiceTests
     [Fact]
     public async Task IngestAsync_TwoBlocksInOneBatch_SecondNegative_IsDetectedWithinBatch()
     {
-        // Regression for the exact bug documented in prepaid_engine's README (bug #4): a
-        // negative-consumption sequence within one in-flight batch must be caught even though
-        // neither row is persisted yet when the second is evaluated.
+        // Regression test: a negative-consumption sequence within one in-flight batch must be
+        // caught even though neither row is persisted yet when the second is evaluated.
         await using var db = CreateContext();
         var service = new LoadSurveyIngestionService(db, new OutOfRangeValidationService(db));
         var meterId = Guid.NewGuid();

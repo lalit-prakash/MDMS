@@ -12,5 +12,6 @@ public class ServicePointConfiguration : IEntityTypeConfiguration<ServicePoint>
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Address).IsRequired().HasMaxLength(512);
         builder.HasOne(s => s.Customer).WithMany().HasForeignKey(s => s.CustomerId);
+        builder.HasIndex(s => s.DistributionTransformerNodeId);
     }
 }

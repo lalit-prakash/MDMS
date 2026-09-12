@@ -17,8 +17,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Auto-apply pending migrations in Development only, matching prepaid_engine's own
-    // convention — never runs outside Development.
+    // Auto-apply pending migrations in Development only — never runs outside Development.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MdmsDbContext>();
     db.Database.Migrate();

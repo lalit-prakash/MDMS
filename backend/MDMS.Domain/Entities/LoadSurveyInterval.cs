@@ -4,11 +4,9 @@ using MDMS.Domain.Enums;
 namespace MDMS.Domain.Entities;
 
 /// <summary>
-/// One 30-minute Load Survey (LS) interval block for a meter. Field shape mirrors
-/// prepaid_engine's own <c>LoadSurveyInterval</c> deliberately, so exposing this as
-/// validated data to prepaid_engine (replacing its current self-ingestion) is a near-direct
-/// mapping. MDMS adds explicit <see cref="Source"/> provenance on top, since distinguishing
-/// received/estimated/edited values is MDMS's job, not the billing engine's.
+/// One 30-minute Load Survey (LS) interval block for a meter, carrying explicit
+/// <see cref="Source"/> provenance — distinguishing received/estimated/edited values is MDMS's
+/// job, not any downstream billing system's.
 /// </summary>
 public class LoadSurveyInterval : Entity
 {

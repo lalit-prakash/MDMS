@@ -4,10 +4,9 @@ using MDMS.Domain.Enums;
 namespace MDMS.Domain.Entities;
 
 /// <summary>
-/// The meter's authoritative Daily Load Profile (DLP), created at the 00:00 boundary. Mirrors
-/// prepaid_engine's <c>DailyLoadProfile</c> shape (including the provisional/estimated-when-
-/// missing concept) since DLP settlement math is expected to keep living in prepaid_engine —
-/// MDMS's job is only to produce and validate the trusted daily figure it settles against.
+/// The meter's authoritative Daily Load Profile (DLP), created at the 00:00 boundary, including a
+/// provisional/estimated-when-missing path. MDMS's job is to produce and validate the trusted
+/// daily figure — any downstream settlement/billing math against that figure is out of scope here.
 /// </summary>
 public class DailyLoadProfile : Entity
 {
@@ -35,9 +34,9 @@ public class DailyLoadProfile : Entity
 
     /// <summary>
     /// A provisional profile substituted when no real DLP arrives by the daily processing
-    /// deadline — never silently treated as zero consumption. Matches prepaid_engine's demo
-    /// estimation rule (average of up to the previous 7 valid DLPs, 0 if none exist), kept here
-    /// so MDMS is the single place that rule is implemented once a real estimation service exists.
+    /// deadline — never silently treated as zero consumption. The estimation rule itself (e.g.
+    /// averaging recent valid DLPs) belongs in a real estimation service; this factory only
+    /// records the outcome as explicitly provisional/estimated.
     /// </summary>
     public static DailyLoadProfile CreateProvisional(
         Guid servicePointId, Guid meterId, DateOnly profileDate, decimal estimatedConsumptionKwh)

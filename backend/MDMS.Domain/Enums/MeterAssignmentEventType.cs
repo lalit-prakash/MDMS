@@ -1,6 +1,6 @@
 namespace MDMS.Domain.Enums;
 
-/// <summary>Why a meter assignment record was created. Mirrors prepaid_engine's enum of the same name.</summary>
+/// <summary>Why a meter assignment record was created.</summary>
 public enum MeterAssignmentEventType
 {
     InitialInstallation = 1,

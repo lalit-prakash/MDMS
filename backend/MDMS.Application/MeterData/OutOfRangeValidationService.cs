@@ -33,14 +33,14 @@ public class OutOfRangeValidationService
         Guid meterId, MeasurementRangeType measurementType, CancellationToken cancellationToken = default)
     {
         var meterSpecific = await _db.MeasurementRangeThresholds
-            .Where(t => t.MeasurementType == measurementType && t.MeterId == meterId)
+            .Where(t => t.MeasurementType == measurementType && t.MeterId == meterId && t.IsActive)
             .OrderByDescending(t => t.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
         if (meterSpecific is not null)
             return meterSpecific;
 
         return await _db.MeasurementRangeThresholds
-            .Where(t => t.MeasurementType == measurementType && t.MeterId == null)
+            .Where(t => t.MeasurementType == measurementType && t.MeterId == null && t.IsActive)
             .OrderByDescending(t => t.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -136,13 +136,13 @@ public class OutOfRangeValidationService
             return new List<Guid> { id };
 
         var meterIds = await _db.MeasurementRangeThresholds
-            .Where(t => t.MeasurementType == measurementType && t.MeterId != null)
+            .Where(t => t.MeasurementType == measurementType && t.MeterId != null && t.IsActive)
             .Select(t => t.MeterId!.Value)
             .Distinct()
             .ToListAsync(cancellationToken);
 
         var hasGlobalThreshold = await _db.MeasurementRangeThresholds
-            .AnyAsync(t => t.MeasurementType == measurementType && t.MeterId == null, cancellationToken);
+            .AnyAsync(t => t.MeasurementType == measurementType && t.MeterId == null && t.IsActive, cancellationToken);
 
         if (hasGlobalThreshold)
             meterIds = await allMeterIdsWithValidMeasurements().Distinct().ToListAsync(cancellationToken);

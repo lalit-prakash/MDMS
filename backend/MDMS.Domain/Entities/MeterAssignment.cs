@@ -6,10 +6,9 @@ namespace MDMS.Domain.Entities;
 /// <summary>
 /// An audit record binding a <see cref="Meter"/> to a <see cref="ServicePoint"/> for a span of
 /// time, and — on replacement — the closing/opening readings that make the boundary explicit.
-/// Mirrors prepaid_engine's <c>MeterAssignment</c>: the entire point of this record is that an
-/// old meter's cumulative reading is never compared against a new meter's, because every
-/// measurement is scoped to a specific <see cref="MeterId"/> and every assignment scoped to a
-/// specific time range.
+/// The entire point of this record is that an old meter's cumulative reading is never compared
+/// against a new meter's, because every measurement is scoped to a specific <see cref="MeterId"/>
+/// and every assignment scoped to a specific time range.
 /// </summary>
 public class MeterAssignment : Entity
 {

@@ -1,58 +1,84 @@
 # MDMS
 
-Meter Data Management System — meter master data, measurement ingestion/VEE, and load-profile
-data, built as the upstream trusted-data source for downstream billing engines such as
-[`prepaid_engine`](https://github.com/lalit-prakash/prepaid_engine).
+Meter Data Management System — meter master data, measurement ingestion/VEE, load-profile data,
+and DISCOM reference/hierarchy configuration, built as a standalone, self-contained platform for
+smart-meter data.
 
 **Scope**: this repository owns meter/service-point/customer master data, meter installation and
-replacement history, Load Survey (LS) and Daily Load Profile (DLP) ingestion, and measurement
-data-quality (VEE) processing. It does **not** own tariffs, wallets, billing, recharge, or RC/DC —
-that is `prepaid_engine`'s responsibility and stays there. See
-[Compatibility & boundary](#compatibility--boundary-with-prepaid_engine) below.
+replacement history, Load Survey (LS) and Daily Load Profile (DLP) ingestion, measurement
+data-quality (VEE) processing, and reference/hierarchy configuration (tariff categories, the
+electrical Substation/Feeder/DT hierarchy, the organizational Zone/Circle/Division/Sub
+Division/Section hierarchy, user/role records, VEE rule definitions). It does **not** own tariff
+rate calculation, wallets, billing, recharge, or RC/DC — those are the responsibility of a separate
+downstream billing system, referenced here only by account number, never duplicated. Energy
+audit, revenue protection, prepaid engine, installation/QC workflow, meter inventory, and
+complaints/ticketing are all planned but not yet built (see "Not yet built").
 
 **Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
 / negative-consumption detection and data-quality holds, Daily Load Profile ingestion, a
-configurable out-of-range VEE check, meter master data with a temporal installation/replacement
-history, EF Core migrations, and 27 passing unit tests. No frontend yet. This is a first vertical
-slice, not a complete MDMS.
+configurable out-of-range VEE check (generalized as the first of possibly several stored VEE rule
+types), meter master data with a temporal installation/replacement history, a `config` module
+(tariff categories, the electrical hierarchy, the organizational hierarchy), user/role records
+(data only, no auth/enforcement yet), tenant scoping on every table, EF Core migrations, and 49
+passing unit tests. No frontend, no auth, no billing module yet. This is an early vertical slice,
+not a complete MDMS.
 
 ## Structure
 
 - `backend/` — .NET 8 solution (`MDMS.sln`) — see note on target framework below
   - `MDMS.Api` — ASP.NET Core Web API (controllers, Swagger, migration bootstrap)
-  - `MDMS.Application` — use cases (`LoadSurveyIngestionService`), persistence port (`IMdmsDbContext`)
+  - `MDMS.Application` — use cases (`LoadSurveyIngestionService`, `OutOfRangeValidationService`, ...), persistence port (`IMdmsDbContext`)
   - `MDMS.Domain` — entities, enums, no external dependencies beyond EF Core's `DbSet<T>` shape
     referenced from `IMdmsDbContext`
   - `MDMS.Infrastructure` — EF Core (PostgreSQL/Npgsql) persistence, entity configurations, migrations
   - `MDMS.Tests` — xUnit tests (EF Core InMemory provider)
 
-**Target framework note**: the requested stack is .NET 10, but only the .NET 8 SDK is available
-in this environment (.NET 10 is still pre-GA as of writing). Everything here targets **net8.0**
-with EF Core 8.x pinned explicitly (the SDK defaults to EF Core 10.x, which is net10.0-only).
-Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package versions to their
-10.x releases is a mechanical change once you install that SDK — no architectural changes needed.
+Modules are organized as folders/namespaces within these four projects rather than separate
+projects or services — a modular monolith. `MeterData` (ingestion + VEE) and `Config` (reference
+data) are the two modules so far; `energy-audit`, `billing`, `wfm`, and `complaints` are planned
+the same way (see "Not yet built").
+
+**Target framework note**: the target stack is .NET 10, but only the .NET 8 SDK is available in
+this environment (.NET 10 is still pre-GA as of writing). Everything here targets **net8.0** with
+EF Core 8.x pinned explicitly (the SDK defaults to EF Core 10.x, which is net10.0-only). Bumping
+every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package versions to their 10.x
+releases is a mechanical change once that SDK is installed — no architectural changes needed.
+
+## Tenant scoping
+
+Every entity carries a `TenantId` (see `Entity.TenantId`), defaulting to a single well-known
+`DefaultTenantId` until a real multi-tenant resolver exists. This is deliberately non-invasive:
+no existing constructor had to change to accept a tenant parameter, since retrofitting a tenant
+column later (once real per-request tenant context exists) is far cheaper than retrofitting it
+across a live schema. `Entity.AssignTenant(...)` exists for that future resolver to call; nothing
+calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 
 ## Domain model (this slice)
 
 | Entity | Purpose |
 |---|---|
-| `Customer` | Utility account — thin master record; `AccountNumber` is the shared key with `prepaid_engine`'s `Consumer` |
+| `Tenant` | A DISCOM — the tenant boundary every other table scopes to |
+| `Customer` | Utility account — thin master record; `AccountNumber` is the key a downstream billing system would reference this by |
 | `ServicePoint` | A customer's physical point of supply — the stable identity a meter is installed against over time |
 | `Meter` | Physical meter asset master data (serial number, phase, lifecycle status) |
 | `MeterAssignment` | Temporal audit record binding a meter to a service point — installation, replacement (with closing/opening readings), removal. Guarantees an old meter's cumulative reading is never compared against a new meter's |
-| `LoadSurveyInterval` | One 30-minute LS block — shape mirrors `prepaid_engine`'s own entity of the same name so the eventual integration is a near-direct mapping. Carries explicit `Source` (Received/Estimated/Edited/Calculated) and `Quality` (Valid/NegativeConsumption/...) |
-| `DailyLoadProfile` | The meter's daily profile at the 00:00 boundary, with a provisional/estimated path for a missing day — mirrors `prepaid_engine`'s DLP shape |
-| `DataQualityHold` | An active hold blocking further processing for a meter after a data-quality event (e.g. negative consumption) — equivalent in spirit to `prepaid_engine`'s `MeterBillingControl`, renamed since this is about measurement validity, not billing |
-| `MeasurementRangeThreshold` | A configurable min/max plausibility range for LS or DLP consumption (`MeasurementType` keeps the two separate, since their plausible scales are entirely different) — global default (`MeterId == null`) or meter-specific override, per measurement type. Configuration, not a hard-coded constant, per MDMS's stated principles |
+| `LoadSurveyInterval` | One 30-minute LS block, with explicit `Source` (Received/Estimated/Edited/Calculated) and `Quality` (Valid/NegativeConsumption/OutOfRange/...) |
+| `DailyLoadProfile` | The meter's daily profile at the 00:00 boundary, with a provisional/estimated path for a missing day |
+| `DataQualityHold` | An active hold blocking further processing for a meter after a data-quality event (e.g. negative consumption) — about measurement validity, not billing |
+| `VeeRuleDefinition` | Abstract base for a stored, configurable VEE rule (table-per-hierarchy) — data, not a hard-coded constant. `MeasurementRangeThreshold` is the first concrete rule type |
+| `MeasurementRangeThreshold` | A `VeeRuleDefinition` subclass: a configurable min/max plausibility range for LS or DLP consumption (`MeasurementType` keeps the two separate — their plausible scales are entirely different) — global default (`MeterId == null`) or meter-specific override, per measurement type |
+| `TariffCategory` | A billing-category reference (Domestic, Industrial, ...) used to classify a customer for downstream TOD-slab mapping — classification only, no rate/slab math |
+| `HierarchyNode` | One node of the **electrical** hierarchy — Substation → Feeder → Distribution Transformer — that energy-audit aggregation will roll up through. A single self-referencing tree, level enforced by `NodeType`. A `ServicePoint` links to a DT node to complete the chain to the consumer |
+| `OrgUnit` | One node of the **organizational** hierarchy — Zone → Circle → Division → Sub Division → Section — used for RBAC scoping, dashboards, and work assignment. Deliberately a separate tree from `HierarchyNode`; the two never share levels or nodes |
+| `User` | A named user with a fixed `Role` (12 roles: Admin, ItManager, Nomc, Supervisor, QualityIncharge, OmSupervisor, Installer, OmExecutive, Contractor, UtilityManager, ComplaintDesk, StoreManager) and an `OrgUnitId` scope (required for every role except Admin). **Data only** — no login/credentials/permission enforcement exists yet |
 
 ### Load Survey ingestion
 
 `LoadSurveyIngestionService.IngestAsync` validates a batch of LS blocks:
 
 - Tracks each meter's last-known valid cumulative reading **across the whole in-flight batch**,
-  not only already-persisted rows — this specifically avoids a bug `prepaid_engine`'s own README
-  documents it hit (two blocks for the same meter in one request, where the second is a genuine
-  negative-consumption event that a saved-rows-only check would miss). Covered by
+  not only already-persisted rows, so two blocks for the same meter in one request can't both
+  incorrectly come back Valid when the second is actually a negative-consumption event. Covered by
   `IngestAsync_TwoBlocksInOneBatch_SecondNegative_IsDetectedWithinBatch`.
 - A cumulative reading lower than the prior interval for the same meter is rejected
   (`NegativeConsumption`) and raises (or reactivates) a `DataQualityHold` for that meter — never
@@ -60,16 +86,14 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
 - Idempotent: a duplicate interval (same `MeterId + IntervalStartUtc + IntervalEndUtc`), whether
   already persisted or repeated within the same batch, is a no-op, not an error. The database
   also enforces this uniquely as a second layer.
-- A bad item never fails the rest of the batch — matches `prepaid_engine`'s established batch
-  pattern (see its conversions/billing-holds-clear-bulk endpoints).
+- A bad item never fails the rest of the batch.
 - Also runs the out-of-range plausibility check inline (see below) against each interval's
   computed consumption before it's stored — an implausible reading is flagged the moment it
   arrives, not only on the next on-demand sweep.
 
 ### Daily Load Profile ingestion
 
-`DailyLoadProfileIngestionService.IngestAsync` mirrors `prepaid_engine`'s own DLP behavior
-("replaces a provisional profile if one exists"):
+`DailyLoadProfileIngestionService.IngestAsync`:
 
 - No existing profile for that `ServicePointId + MeterId + ProfileDate` → stores it as `Received`.
 - An existing **provisional** (`Estimated`/`Missing`) profile for that key → replaced by the real
@@ -87,8 +111,8 @@ LS interval's plausible range and a full day's DLP range are entirely different 
 threshold configured for one type is never consulted for the other).
 
 - A meter-specific `MeasurementRangeThreshold` takes precedence over the global default for that
-  type (`MeterId == null`); a meter with neither configured is never flagged for that type — no
-  threshold means no opinion, not a false positive.
+  type (`MeterId == null`); a meter with neither configured — or only an inactive one — is never
+  flagged for that type. No threshold means no opinion, not a false positive.
 - **Runs inline during ingestion**: both `LoadSurveyIngestionService` and
   `DailyLoadProfileIngestionService` resolve the effective threshold for their respective type and
   flag a breach `OutOfRange` via `FlagOutOfRange()` before the row is ever stored as `Valid` — the
@@ -97,37 +121,41 @@ threshold configured for one type is never consulted for the other).
   still trusted as the anchor for the next interval's delta, and it never raises a
   `DataQualityHold` on its own (unlike negative consumption). The "last known reading"
   sequence-continuity query correspondingly treats `OutOfRange` as trustworthy and only excludes
-  `NegativeConsumption` rows — a real bug this feature's own tests caught: an earlier version
-  filtered to `Quality == Valid` only, which broke continuity for the interval immediately after
-  an out-of-range one.
+  `NegativeConsumption` rows.
 - **Also available on demand**: `POST /api/v1/vee/out-of-range-checks/ls/run` and
   `.../dlp/run` re-evaluate every currently-`Valid` row of that type for a meter (or every meter
   with a configured threshold of that type, if none is specified) — useful for retroactively
   applying a threshold added/corrected *after* data was already ingested, which the inline check
   alone can't do.
+- **`MeasurementRangeThreshold` is a `VeeRuleDefinition`**, not a standalone table: rules of every
+  type share one `VeeRuleDefinitions` table (discriminated by `RuleType`) with common fields
+  (`MeterId`, `IsActive`) on the shared base and type-specific fields (here, `Min`/`MaxConsumptionKwh`)
+  on the subclass — so a future config screen can list every rule of every type in one query, and
+  a future rule type (continuity, missing-interval estimation) is a new subclass, not a rewrite of
+  this one. `IsActive` is enforced: a deactivated threshold is treated exactly like no threshold.
 
-## Compatibility & boundary with prepaid_engine
+### Config module
 
-`prepaid_engine` (.NET 8, PostgreSQL, 317 tests, real Angular frontend) currently does its own
-lightweight LS/DLP ingestion and negative-consumption detection (`LoadSurveyInterval`,
-`DailyLoadProfile`, `MeterBillingControl`) because no MDMS existed yet — its own README calls
-this out as a stand-in ("a formal VEE service... a real HES/MDM adapter... are explicitly out of
-scope for this phase"). MDMS is meant to take over that measurement-side responsibility.
+`ConfigController` (`/api/v1/config`) covers reference/hierarchy master data that other modules
+will depend on:
 
-**Stays in `prepaid_engine`, untouched by this work**: `Tariff`/`TariffSlab`/`TouPeriod`,
-`ElectricityDuty`, `FppasCharge`, TMC/CPMC, `ArrearRecovery`, `PrepaidWallet`/`WalletTransaction`,
-`PrepaidBill`, `RechargeTransaction`, `MeterCommand`, `ConnectivityCommand`, `ConversionRequest`,
-`ReconciliationAdjustment`, `OperationalException`, `AuditEntry`, `TariffVersion`, `BillingRun` —
-all genuine billing/wallet/tariff/RMS-integration domain logic, verified against MePDCL's real
-tariff book. Nothing here duplicates it.
-
-**Moves to MDMS** (this repo, greenfield): meter/service-point/customer master data, meter
-installation/replacement history, LS/DLP ingestion and validation, data-quality holds.
-
-**Integration point (not yet built)**: `prepaid_engine` is expected to eventually consume
-validated LS/DLP data from MDMS's API instead of ingesting it directly — mirroring the
-`IRmsClient`/`MockRmsClient` port pattern it already uses for RMS. That port does not exist in
-`prepaid_engine` yet; per your decision, this session left `prepaid_engine`'s code untouched.
+- **Tariff categories** (`/tariff-categories`): a simple code/name/description reference used to
+  classify customers for downstream billing categorization — MDMS does not compute tariff rates
+  or slabs itself.
+- **Electrical hierarchy** (`/hierarchy`): Substation/Feeder/Distribution-Transformer nodes as one
+  self-referencing tree, for energy-audit aggregation. `HierarchyNode.CreateChild` enforces that a
+  node only ever nests directly under a parent exactly one level coarser (Feeder under Substation,
+  DT under Feeder) — never skipping a level.
+- **Organizational hierarchy** (`/org-units`): Zone/Circle/Division/Sub-Division/Section nodes as
+  a *separate* self-referencing tree, for RBAC scoping and dashboards — never conflated with the
+  electrical hierarchy above, since they serve different purposes and don't share levels.
+  `OrgUnit.CreateChild` enforces the same never-skip-a-level rule across all five levels.
+- **Users** (`/api/v1/users`, `UsersController`): `Username`/`DisplayName`/`Role`/`OrgUnitId`
+  records. Every role except Admin must be scoped to an `OrgUnit` — enforced in the `User`
+  constructor. This is identity/authorization *data* only; there is no login, credential, or
+  permission-enforcement mechanism yet.
+- No role/authorization check is applied to these endpoints yet — that needs a decision on an auth
+  package (JWT bearer vs. another scheme) before it can be added; see "Not yet built".
 
 ## Getting started
 
@@ -187,6 +215,16 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `POST /api/v1/vee/thresholds` | Configure a plausibility threshold for a `measurementType` (`LoadSurveyInterval` or `DailyLoadProfile`) — global (`meterId: null`) or meter-specific |
 | `POST /api/v1/vee/out-of-range-checks/ls/run?meterId=` | Re-evaluate stored LS intervals against their effective threshold, flagging breaches `OutOfRange`; omit `meterId` to sweep every meter with a configured LS threshold |
 | `POST /api/v1/vee/out-of-range-checks/dlp/run?meterId=` | Same, for Daily Load Profiles |
+| `GET /api/v1/config/tariff-categories` / `POST /api/v1/config/tariff-categories` | List / create tariff category reference data |
+| `GET /api/v1/config/hierarchy?nodeType=` | List electrical hierarchy nodes (Substation/Feeder/DT), optionally filtered by level |
+| `GET /api/v1/config/hierarchy/{id}/children` | List a node's direct children |
+| `POST /api/v1/config/hierarchy` | Create an electrical hierarchy node (Substation needs no parent; Feeder/DT each require a parent exactly one level coarser) |
+| `GET /api/v1/config/org-units?unitType=` | List organizational hierarchy units (Zone/Circle/Division/Sub Division/Section), optionally filtered by level |
+| `GET /api/v1/config/org-units/{id}/children` | List a unit's direct children |
+| `POST /api/v1/config/org-units` | Create an org unit (Zone needs no parent; every other level requires one exactly one level coarser) |
+| `GET /api/v1/users?role=` / `GET /api/v1/users/{id}` | List / get user records, optionally filtered by role |
+| `POST /api/v1/users` | Create a user (`role` + `orgUnitId`; every role except Admin requires an org unit) |
+| `POST /api/v1/users/{id}/reassign` | Change a user's role and/or org unit |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -199,23 +237,41 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**27 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**49 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
 sequence and never raises a hold), DLP ingestion (new profile, provisional replacement, rejecting
 an overwrite of a received profile, inline out-of-range flagging), threshold resolution
 (meter-specific vs. global vs. unconfigured, and that LS/DLP thresholds are looked up
-independently and never leak into each other), and the on-demand out-of-range check for both LS
-and DLP (flagging a breach without mutating the underlying value, ignoring meters with no
-threshold, and sweeping every thresholded meter when none is specified).
+independently and never leak into each other), the on-demand out-of-range check for both LS and
+DLP, the `VeeRuleDefinition`/`MeasurementRangeThreshold` table-per-hierarchy round-trip (including
+that a deactivated rule is no longer the effective one), tenant-default assignment, tariff
+category validation, electrical-hierarchy-level enforcement, organizational-hierarchy-level
+enforcement, `ServicePoint`-to-DT-node linking, and `User` role/org-scope validation (every
+non-Admin role requires an org unit).
 
 ## Not yet built
 
 - Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
   first" preference.
-- A fuller VEE rules engine beyond negative-consumption + out-of-range checks (estimation
-  scheduling, provisional-DLP auto-creation when a day's profile never arrives).
-- The `IMeterDataClient`-style integration port on the `prepaid_engine` side.
-- Authentication/authorization.
+- A fuller VEE rules engine beyond negative-consumption + out-of-range checks (timestamp/interval-
+  completeness validation, sequence checks beyond negative-consumption, interpolation/estimation,
+  provisional-DLP auto-creation when a day's profile never arrives).
+- `energy-audit` module: Substation/feeder/DT aggregation and loss computation (real-loss vs.
+  coverage-loss split) on top of the `HierarchyNode` tree and `ServicePoint.DistributionTransformerNodeId`
+  link that now exist.
+- `revenue-protection` module: anomaly signals, risk scoring, and lead workflow.
+- `prepaid` module: wallet/ledger, recharge idempotency, daily billing, disconnect/reconnect
+  command workflow with confirmation (not just "sent").
+- `billing` module: bill determinant generation (TOD/TOU slab mapping using `TariffCategory`) from
+  validated interval data.
+- Installation/QC workflow (3-level quality check state machine), meter inventory state machine,
+  `wfm`, and `complaints`/auto-ticket modules.
+- Authentication/authorization enforcement — the `User`/`Role`/`OrgUnit` *data model* now exists,
+  but nothing checks it yet; needs an auth package decision (JWT bearer vs. another scheme) first.
+- IP (15-minute Instantaneous Profile) and BP (monthly Billing Profile) ingestion — only LS
+  (30-min) and DP/DLP (daily) exist today.
+- A real multi-tenant resolver — `TenantId` exists on every table today but always defaults to one
+  well-known tenant; nothing yet assigns a different one per request.
 - Seed data / demo data.

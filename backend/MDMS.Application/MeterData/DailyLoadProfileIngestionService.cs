@@ -6,11 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MDMS.Application.MeterData;
 
 /// <summary>
-/// Validates and stores an incoming Daily Load Profile. Mirrors prepaid_engine's own DLP
-/// ingestion behavior ("replaces a provisional profile if one exists") — a provisional/estimated
-/// profile created because the real DLP hadn't arrived yet is swapped out the moment the real one
-/// does; a profile already marked <see cref="MeasurementSource.Received"/> is never overwritten,
-/// since that would silently discard a genuine meter-reported value. Also applies
+/// Validates and stores an incoming Daily Load Profile: a provisional/estimated profile created
+/// because the real DLP hadn't arrived yet is swapped out the moment the real one does; a profile
+/// already marked <see cref="MeasurementSource.Received"/> is never overwritten, since that would
+/// silently discard a genuine meter-reported value. Also applies
 /// <see cref="OutOfRangeValidationService"/>'s plausibility check inline, mirroring
 /// <see cref="LoadSurveyIngestionService"/>'s own inline out-of-range flagging.
 /// </summary>
