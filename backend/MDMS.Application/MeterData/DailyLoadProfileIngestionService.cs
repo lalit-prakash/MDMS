@@ -10,15 +10,19 @@ namespace MDMS.Application.MeterData;
 /// ingestion behavior ("replaces a provisional profile if one exists") — a provisional/estimated
 /// profile created because the real DLP hadn't arrived yet is swapped out the moment the real one
 /// does; a profile already marked <see cref="MeasurementSource.Received"/> is never overwritten,
-/// since that would silently discard a genuine meter-reported value.
+/// since that would silently discard a genuine meter-reported value. Also applies
+/// <see cref="OutOfRangeValidationService"/>'s plausibility check inline, mirroring
+/// <see cref="LoadSurveyIngestionService"/>'s own inline out-of-range flagging.
 /// </summary>
 public class DailyLoadProfileIngestionService
 {
     private readonly IMdmsDbContext _db;
+    private readonly OutOfRangeValidationService _outOfRangeValidationService;
 
-    public DailyLoadProfileIngestionService(IMdmsDbContext db)
+    public DailyLoadProfileIngestionService(IMdmsDbContext db, OutOfRangeValidationService outOfRangeValidationService)
     {
         _db = db;
+        _outOfRangeValidationService = outOfRangeValidationService;
     }
 
     public async Task<DailyLoadProfileIngestResult> IngestAsync(
@@ -50,11 +54,16 @@ public class DailyLoadProfileIngestionService
         var received = DailyLoadProfile.CreateReceived(
             request.ServicePointId, request.MeterId, request.ProfileDate, request.ConsumptionKwh);
 
+        var threshold = await _outOfRangeValidationService.GetEffectiveThresholdAsync(
+            request.MeterId, MeasurementRangeType.DailyLoadProfile, cancellationToken);
+        if (threshold is not null && !threshold.IsWithinRange(received.ConsumptionKwh))
+            received.FlagOutOfRange();
+
         _db.DailyLoadProfiles.Add(received);
         await _db.SaveChangesAsync(cancellationToken);
 
         return new DailyLoadProfileIngestResult(
             received.Id, received.ServicePointId, received.MeterId, received.ProfileDate,
-            received.ConsumptionKwh, received.Source, replacedProvisional);
+            received.ConsumptionKwh, received.Source, received.Quality, replacedProvisional);
     }
 }

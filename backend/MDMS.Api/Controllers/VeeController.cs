@@ -1,6 +1,7 @@
 using MDMS.Application.Common;
 using MDMS.Application.MeterData;
 using MDMS.Domain.Entities;
+using MDMS.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,8 +9,9 @@ namespace MDMS.Api.Controllers;
 
 /// <summary>
 /// VEE (Validation/Estimation/Editing) configuration and checks. Currently covers out-of-range
-/// plausibility validation for Load Survey consumption; negative-consumption checks run inline
-/// during ingestion (see <c>MeterDataController.IngestLoadSurvey</c>) rather than here.
+/// plausibility validation for both Load Survey and Daily Load Profile consumption;
+/// negative-consumption checks run inline during ingestion (see
+/// <c>MeterDataController.IngestLoadSurvey</c>) rather than here.
 /// </summary>
 [ApiController]
 [Route("api/v1/vee")]
@@ -25,10 +27,15 @@ public class VeeController : ControllerBase
     }
 
     [HttpGet("thresholds")]
-    public async Task<IActionResult> ListThresholds(CancellationToken ct)
+    public async Task<IActionResult> ListThresholds([FromQuery] MeasurementRangeType? measurementType, CancellationToken ct)
     {
-        var thresholds = await _db.MeasurementRangeThresholds
-            .OrderBy(t => t.MeterId == null ? 0 : 1) // global default first
+        var query = _db.MeasurementRangeThresholds.AsQueryable();
+        if (measurementType.HasValue)
+            query = query.Where(t => t.MeasurementType == measurementType.Value);
+
+        var thresholds = await query
+            .OrderBy(t => t.MeasurementType)
+            .ThenBy(t => t.MeterId == null ? 0 : 1) // global default first, per type
             .ThenByDescending(t => t.CreatedAtUtc)
             .ToListAsync(ct);
 
@@ -43,7 +50,7 @@ public class VeeController : ControllerBase
         try
         {
             threshold = new MeasurementRangeThreshold(
-                request.MeterId, request.MinConsumptionKwh, request.MaxConsumptionKwh);
+                request.MeasurementType, request.MeterId, request.MinConsumptionKwh, request.MaxConsumptionKwh);
         }
         catch (ArgumentException ex)
         {
@@ -59,12 +66,12 @@ public class VeeController : ControllerBase
     /// <summary>
     /// Re-evaluates persisted Valid Load Survey intervals against their effective threshold and
     /// flags any breach as <c>OutOfRange</c>. Omit <paramref name="meterId"/> to sweep every
-    /// meter that has a configured (meter-specific or global) threshold.
+    /// meter that has a configured (meter-specific or global) LS threshold.
     /// </summary>
-    [HttpPost("out-of-range-checks/run")]
-    public async Task<IActionResult> RunOutOfRangeCheck([FromQuery] Guid? meterId, CancellationToken ct)
+    [HttpPost("out-of-range-checks/ls/run")]
+    public async Task<IActionResult> RunLoadSurveyOutOfRangeCheck([FromQuery] Guid? meterId, CancellationToken ct)
     {
-        var flagged = await _validationService.RunCheckAsync(meterId, ct);
+        var flagged = await _validationService.RunLoadSurveyCheckAsync(meterId, ct);
         return Ok(new
         {
             flaggedCount = flagged.Count,
@@ -76,6 +83,30 @@ public class VeeController : ControllerBase
                 i.IntervalEndUtc,
                 i.ConsumptionKwh,
                 i.Quality
+            })
+        });
+    }
+
+    /// <summary>
+    /// Re-evaluates persisted Valid Daily Load Profiles against their effective threshold and
+    /// flags any breach as <c>OutOfRange</c>. Omit <paramref name="meterId"/> to sweep every
+    /// meter that has a configured (meter-specific or global) DLP threshold.
+    /// </summary>
+    [HttpPost("out-of-range-checks/dlp/run")]
+    public async Task<IActionResult> RunDailyLoadProfileOutOfRangeCheck([FromQuery] Guid? meterId, CancellationToken ct)
+    {
+        var flagged = await _validationService.RunDailyLoadProfileCheckAsync(meterId, ct);
+        return Ok(new
+        {
+            flaggedCount = flagged.Count,
+            flagged = flagged.Select(p => new
+            {
+                p.Id,
+                p.MeterId,
+                p.ServicePointId,
+                p.ProfileDate,
+                p.ConsumptionKwh,
+                p.Quality
             })
         });
     }
