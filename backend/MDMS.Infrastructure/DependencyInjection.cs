@@ -1,6 +1,7 @@
 using MDMS.Application.Common;
 using MDMS.Application.EnergyAudit;
 using MDMS.Application.MeterData;
+using MDMS.Application.RevenueProtection;
 using MDMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<OutOfRangeValidationService>();
         services.AddScoped<MissingIntervalEstimationService>();
         services.AddScoped<EnergyAuditService>();
+        services.AddScoped<RevenueProtectionService>();
 
         return services;
     }

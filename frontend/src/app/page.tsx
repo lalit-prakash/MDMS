@@ -39,6 +39,11 @@ const TILES = [
     title: "Complaints",
     description: "Consumer complaint tickets with SLA tracking through resolution and closure.",
   },
+  {
+    href: "/revenue-protection",
+    title: "Revenue Protection",
+    description: "Risk signals, scored leads, and an investigation workflow through closure.",
+  },
 ];
 
 export default function HomePage() {

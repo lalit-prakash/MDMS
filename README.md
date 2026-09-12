@@ -23,7 +23,7 @@ hierarchy, the organizational hierarchy), user/role records (data only, no auth/
 a first `energy-audit` module (transparent supply-vs-consumption balance, no automated real-loss/
 coverage-loss split), a `complaints` ticket module with SLA tracking, meter inventory allocation
 and a three-level installation quality check (both backend-only — no frontend page yet), tenant
-scoping on every table, EF Core migrations, and 87 passing backend unit tests — plus a first
+scoping on every table, EF Core migrations, and 98 passing backend unit tests — plus a first
 working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with one page per backend
 module that has one. No auth, no billing module yet on either side. This is an early vertical
 slice, not a complete MDMS.
@@ -40,9 +40,8 @@ slice, not a complete MDMS.
 
 Modules are organized as folders/namespaces within these four projects rather than separate
 projects or services — a modular monolith. `MeterData` (ingestion + VEE), `Config` (reference
-data), `EnergyAudit`, `Complaints`, and meter inventory/installation-QC (in `MetersController`'s
-sibling `MeterInventoryController`) are the modules so far; `billing`, `wfm`, and
-`revenue-protection` are planned the same way (see "Not yet built").
+data), `EnergyAudit`, `Complaints`, meter inventory/installation-QC, and `RevenueProtection` are
+the modules so far; `billing` and `wfm` are planned the same way (see "Not yet built").
 
 **Target framework note**: the target stack is .NET 10, but only the .NET 8 SDK is available in
 this environment (.NET 10 is still pre-GA as of writing). Everything here targets **net8.0** with
@@ -81,6 +80,8 @@ calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 | `NetworkEnergyReading` | The supply-side energy that entered one `HierarchyNode` (Substation/Feeder/DT) on one day — entered directly today, since there's no feeder/DTR meter ingestion pipeline yet |
 | `Complaint` | A consumer complaint tracked Open → Assigned → InProgress → Resolved → Closed, with an SLA due-time from a caller-supplied duration. Closing requires having gone through Resolved first ("NOMC validation" per the spec) |
 | `MeterInventoryRecord` | A meter's WFM/inventory allocation state machine (Received → InStore → AssignedToContractor → AssignedToInstaller → Installed → Commissioned → Active, plus a replacement sub-flow) — deliberately separate from `Meter.Status`, which is just the meter's own simple master-data lifecycle |
+| `RevenueProtectionLead` | An investigation lead (Detected → Scored → Reviewed → Assigned → FieldInvestigation → FindingRecorded → ActionTaken → optionally RecoveryRecorded → Closed) — never a legal conclusion, per the spec's own caution |
+| `RiskSignal` | One observed risk indicator contributing to a lead's `RiskScore` — the weight is caller-supplied, never a hard-coded table, since "the actual weights must be calibrated by the utility" |
 | `InstallationQualityCheck` | The three-level installation quality check (Contractor L1 → Quality Incharge L2 → Utility Manager L3 → RMS sync → MIS onboarding). A rejection at L2 returns to L1Pending, at L3 to L2Pending — never all the way back to Draft |
 
 ### Load Survey ingestion
@@ -241,6 +242,23 @@ installation quality-approved":
   `409 Conflict`), matching the rest of the codebase's transition discipline.
 - **No frontend page yet** for either workflow — backend-only so far, unlike every other module.
 
+### Revenue protection
+
+`RevenueProtectionController` (`/api/v1/revenue-protection`) implements the spec's lead-generation
+workflow — deliberately framed as investigation support, never a legal conclusion:
+
+- `RevenueProtectionService.RaiseSignalAsync` finds the customer's current open (non-`Closed`)
+  lead, or creates one, then adds a `RiskSignal` and its weight to that lead's `RiskScore`. One
+  open lead per customer at a time — a second signal contributes to the existing investigation
+  rather than fragmenting it.
+- **Signal weights are caller-supplied, never a hard-coded table in this project** — per the
+  spec's own caution that weights "must be calibrated by the utility and should not be presented
+  as legal proof."
+- Lead lifecycle: Detected → Scored (on the first signal) → Reviewed → Assigned →
+  FieldInvestigation → FindingRecorded → ActionTaken → Closed. `RecordRecovery` (→
+  `RecoveryRecorded`) is optional between ActionTaken and Closed — a field visit that turns out to
+  be a false positive still needs a documented closure, not a forced recovery amount.
+
 ## Getting started
 
 ```bash
@@ -328,6 +346,10 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `POST /api/v1/meter-inventory/{meterId}/quality-check` | Start a three-level installation quality check at `Draft` |
 | `GET /api/v1/meter-inventory/quality-checks/{id}` / `GET .../quality-checks?status=` | Get / list quality checks |
 | `POST /api/v1/meter-inventory/quality-checks/{id}/{start-l1,complete-l1,submit-l2,approve-l2,reject-l2,submit-l3,approve-l3,reject-l3,rms-sync-pending,rms-synced,mis-onboarded}` | Quality-check transitions — `409` from the wrong status; the two `reject-*` endpoints require a note |
+| `POST /api/v1/revenue-protection/signals` | Raise a risk signal (creates/reuses an open lead for the customer) |
+| `GET /api/v1/revenue-protection/leads?status=` | List leads, highest risk first |
+| `GET /api/v1/revenue-protection/leads/{id}` | Full lead detail plus its raised signals |
+| `POST /api/v1/revenue-protection/leads/{id}/{review,assign,start-investigation,record-finding,record-action,record-recovery,close}` | Lead transitions, in order — `409` from the wrong status |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -340,7 +362,7 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**87 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**98 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
@@ -357,13 +379,16 @@ successful average-of-neighbors case and the "never guess without both neighbors
 descendant-DT resolution from any level, energy-balance calculation (discrepancy math, data
 completeness, and the no-reading-yet case), the complaint lifecycle (every legal/illegal
 transition, SLA overdue math), the full meter-inventory happy path plus its replacement sub-flow,
-and the installation quality check (full happy path to MisOnboarded, both rejection paths landing
-at the correct level, and rejecting a blank note).
+the installation quality check (full happy path to MisOnboarded, both rejection paths landing
+at the correct level, and rejecting a blank note), and revenue-protection (score accumulation
+across multiple signals, the full lead lifecycle with and without a recorded recovery, that a
+second signal for the same customer joins the existing open lead rather than fragmenting it, and
+that a signal for a customer with only a Closed lead starts a fresh one).
 
 ## Frontend
 
 See [`frontend/README.md`](frontend/README.md) — Next.js + MUI + TanStack Query, one page per
-backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit, Complaints). No auth, no
+backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit, Complaints, Revenue Protection). No auth, no
 charts yet, and no screens for modules that don't exist on the backend (revenue protection,
 prepaid, WFM, billing).
 
@@ -376,7 +401,9 @@ prepaid, WFM, billing).
   and an automated, justified real-loss vs. coverage-loss split (today's `energy-audit` module
   reports the raw discrepancy and data-completeness transparently, but deliberately does not
   attempt that split without a defensible formula).
-- `revenue-protection` module: anomaly signals, risk scoring, and lead workflow.
+- Automated revenue-protection signal detection — today every `RiskSignal` is raised through the
+  API by an operator/external process; nothing in MDMS itself analyzes consumption/tamper data
+  and raises a signal on its own.
 - `prepaid` module: wallet/ledger, recharge idempotency, daily billing, disconnect/reconnect
   command workflow with confirmation (not just "sent").
 - `billing` module: bill determinant generation (TOD/TOU slab mapping using `TariffCategory`) from
