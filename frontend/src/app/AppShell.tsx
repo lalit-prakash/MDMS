@@ -14,6 +14,7 @@ const MODULES = [
   { label: "Energy Audit", href: "/energy-audit" },
   { label: "Complaints", href: "/complaints" },
   { label: "Revenue Protection", href: "/revenue-protection" },
+  { label: "Prepaid", href: "/prepaid" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

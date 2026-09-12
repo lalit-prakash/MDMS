@@ -2,8 +2,9 @@
 
 Next.js (App Router) + TypeScript + MUI + TanStack Query frontend for the MDMS backend.
 
-**Status**: a first working vertical slice — one page per backend module (Meters, Meter Data,
-VEE, Config, Users, Energy Audit, Complaints), a tile-based module hub as the home page (no role-based landing yet — see
+**Status**: a first working vertical slice — one page per backend module that has one (Meters,
+Meter Data, VEE, Config, Users, Energy Audit, Complaints, Revenue Protection, Prepaid — meter
+inventory/installation QC is backend-only so far), a tile-based module hub as the home page (no role-based landing yet — see
 backend's "Not yet built"), and a shared quality/status color language (`qualityColor` in
 `src/app/providers.tsx`) used everywhere a `MeasurementQuality`/`MeasurementSource`/meter status
 value is shown. No authentication exists on either side yet, so every page is visible to everyone
