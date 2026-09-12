@@ -11,8 +11,9 @@ electrical Substation/Feeder/DT hierarchy, the organizational Zone/Circle/Divisi
 Division/Section hierarchy, user/role records, VEE rule definitions). It does **not** own tariff
 rate calculation, wallets, billing, recharge, or RC/DC — those are the responsibility of a separate
 downstream billing system, referenced here only by account number, never duplicated. Energy
-audit, revenue protection, prepaid engine, installation/QC workflow, meter inventory, and
-complaints/ticketing are all planned but not yet built (see "Not yet built").
+audit exists as a first transparent supply-vs-consumption balance; revenue protection, prepaid
+engine, installation/QC workflow, and meter inventory are all planned but not yet built (see "Not
+yet built").
 
 **Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
 / negative-consumption detection and data-quality holds, Daily Load Profile ingestion, VEE
@@ -20,7 +21,8 @@ out-of-range checks and missing-interval estimation with an audit trail, meter m
 temporal installation/replacement history, a `config` module (tariff categories, the electrical
 hierarchy, the organizational hierarchy), user/role records (data only, no auth/enforcement yet),
 a first `energy-audit` module (transparent supply-vs-consumption balance, no automated real-loss/
-coverage-loss split), tenant scoping on every table, EF Core migrations, and 64 passing backend
+coverage-loss split), a `complaints` ticket module with SLA tracking, tenant scoping on every
+table, EF Core migrations, and 74 passing backend
 unit tests — plus a first working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with
 one page per backend module. No auth, no billing module yet on either side. This is an early
 vertical slice, not a complete MDMS.
@@ -37,8 +39,8 @@ vertical slice, not a complete MDMS.
 
 Modules are organized as folders/namespaces within these four projects rather than separate
 projects or services — a modular monolith. `MeterData` (ingestion + VEE), `Config` (reference
-data), and `EnergyAudit` are the modules so far; `billing`, `wfm`, and `complaints` are planned
-the same way (see "Not yet built").
+data), `EnergyAudit`, and `Complaints` are the modules so far; `billing`, `wfm`, and
+`revenue-protection` are planned the same way (see "Not yet built").
 
 **Target framework note**: the target stack is .NET 10, but only the .NET 8 SDK is available in
 this environment (.NET 10 is still pre-GA as of writing). Everything here targets **net8.0** with
@@ -75,6 +77,7 @@ calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 | `User` | A named user with a fixed `Role` (12 roles: Admin, ItManager, Nomc, Supervisor, QualityIncharge, OmSupervisor, Installer, OmExecutive, Contractor, UtilityManager, ComplaintDesk, StoreManager) and an `OrgUnitId` scope (required for every role except Admin). **Data only** — no login/credentials/permission enforcement exists yet |
 | `VeeExecutionRecord` | An immutable audit entry for one VEE rule execution against one measurement slot — rule name, outcome, estimated value if any, and a human-readable explanation. VEE's own audit trail |
 | `NetworkEnergyReading` | The supply-side energy that entered one `HierarchyNode` (Substation/Feeder/DT) on one day — entered directly today, since there's no feeder/DTR meter ingestion pipeline yet |
+| `Complaint` | A consumer complaint tracked Open → Assigned → InProgress → Resolved → Closed, with an SLA due-time from a caller-supplied duration. Closing requires having gone through Resolved first ("NOMC validation" per the spec) |
 
 ### Load Survey ingestion
 
@@ -195,6 +198,25 @@ will depend on:
 - No role/authorization check is applied to these endpoints yet — that needs a decision on an auth
   package (JWT bearer vs. another scheme) before it can be added; see "Not yet built".
 
+### Complaints
+
+`Complaint` (`ComplaintsController`, `/api/v1/complaints`) tracks a consumer ticket through
+Open → Assigned → InProgress → Resolved → Closed:
+
+- The SLA due-time is computed from a caller-supplied duration at creation — never a hard-coded
+  number of hours in code, per the project's "configuration over hard-coded rules" principle.
+  `IsOverdue(nowUtc)` is `true` whenever the current time is past that due-time and the complaint
+  isn't `Closed`.
+- **Closing requires having gone through `Resolved` first** — a field action can never self-close
+  a ticket; the spec's "NOMC validation" step is enforced as a separate required transition, not a
+  convention callers have to remember.
+- Every transition (`AssignTo`, `StartProgress`, `Resolve`, `Close`) throws
+  `InvalidOperationException` from the wrong starting status (surfaced as `409 Conflict` by the
+  API) — e.g. `Close()` throws unless the complaint is currently `Resolved`.
+- Not yet built: the spec's automated ticket triggers (non-communicating/never-communicating
+  meter, missing DP/BP, reconnection-SLA-breach) — every `Complaint` today is raised through the
+  API, never auto-generated by a background process.
+
 ## Getting started
 
 ```bash
@@ -269,6 +291,13 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `POST /api/v1/energy-audit/network-energy-readings` | Record (or revise) a hierarchy node's supply-side energy for one day |
 | `GET /api/v1/energy-audit/network-energy-readings?hierarchyNodeId=` | List recorded network energy readings |
 | `GET /api/v1/energy-audit/balance?hierarchyNodeId=&date=` | The transparent energy balance for a node/day (input, accounted, discrepancy, data completeness) |
+| `GET /api/v1/complaints?status=&overdueOnly=` | List complaints, optionally filtered by status or SLA-overdue |
+| `GET /api/v1/complaints/{id}` | Full complaint detail |
+| `POST /api/v1/complaints` | Raise a complaint (`customerId`, optional `meterId`, `source`, `description`, `slaHours`) |
+| `POST /api/v1/complaints/{id}/assign` | Assign to a user — `409` if already Resolved/Closed |
+| `POST /api/v1/complaints/{id}/start-progress` | Move Assigned → InProgress — `409` otherwise |
+| `POST /api/v1/complaints/{id}/resolve` | Move to Resolved with a mandatory resolution note |
+| `POST /api/v1/complaints/{id}/close` | Move Resolved → Closed — `409` unless already Resolved |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -281,7 +310,7 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**64 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**74 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
@@ -301,9 +330,9 @@ completeness, and the no-reading-yet case).
 ## Frontend
 
 See [`frontend/README.md`](frontend/README.md) — Next.js + MUI + TanStack Query, one page per
-backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit). No auth, no charts yet, and no screens
-for modules that don't exist on the backend (energy audit, revenue protection, prepaid, WFM,
-complaints).
+backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit, Complaints). No auth, no
+charts yet, and no screens for modules that don't exist on the backend (revenue protection,
+prepaid, WFM, billing).
 
 ## Not yet built
 
@@ -320,7 +349,9 @@ complaints).
 - `billing` module: bill determinant generation (TOD/TOU slab mapping using `TariffCategory`) from
   validated interval data.
 - Installation/QC workflow (3-level quality check state machine), meter inventory state machine,
-  `wfm`, and `complaints`/auto-ticket modules.
+  and a `wfm` module. `Complaints` exists (see above) but its automated-ticket triggers
+  (non-communicating meter, missing DP/BP, reconnection-SLA-breach) don't — tickets are only
+  raised through the API today, never auto-generated.
 - Authentication/authorization enforcement — the `User`/`Role`/`OrgUnit` *data model* now exists,
   but nothing checks it yet; needs an auth package decision (JWT bearer vs. another scheme) first.
 - IP (15-minute Instantaneous Profile) and BP (monthly Billing Profile) ingestion — only LS
