@@ -1,6 +1,7 @@
 using MDMS.Application.Common;
 using MDMS.Application.EnergyAudit;
 using MDMS.Application.MeterData;
+using MDMS.Application.Prepaid;
 using MDMS.Application.RevenueProtection;
 using MDMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<MissingIntervalEstimationService>();
         services.AddScoped<EnergyAuditService>();
         services.AddScoped<RevenueProtectionService>();
+        services.AddScoped<PrepaidService>();
 
         return services;
     }

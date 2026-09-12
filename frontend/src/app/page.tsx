@@ -44,6 +44,11 @@ const TILES = [
     title: "Revenue Protection",
     description: "Risk signals, scored leads, and an investigation workflow through closure.",
   },
+  {
+    href: "/prepaid",
+    title: "Prepaid",
+    description: "Wallet balance, idempotent recharge, daily billing, and connect/disconnect.",
+  },
 ];
 
 export default function HomePage() {

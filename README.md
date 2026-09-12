@@ -1,33 +1,30 @@
 # MDMS
 
 Meter Data Management System — meter master data, measurement ingestion/VEE, load-profile data,
-and DISCOM reference/hierarchy configuration, built as a standalone, self-contained platform for
-smart-meter data.
+DISCOM reference/hierarchy configuration, energy audit, complaints, meter inventory/installation
+QC, revenue protection, and a prepaid wallet — built as a standalone, self-contained platform for
+smart-meter data and its downstream operational/commercial workflows.
 
-**Scope**: this repository owns meter/service-point/customer master data, meter installation and
-replacement history, Load Survey (LS) and Daily Load Profile (DLP) ingestion, measurement
-data-quality (VEE) processing, and reference/hierarchy configuration (tariff categories, the
-electrical Substation/Feeder/DT hierarchy, the organizational Zone/Circle/Division/Sub
-Division/Section hierarchy, user/role records, VEE rule definitions). It does **not** own tariff
-rate calculation, wallets, billing, recharge, or RC/DC — those are the responsibility of a separate
-downstream billing system, referenced here only by account number, never duplicated. Energy
-audit exists as a first transparent supply-vs-consumption balance; revenue protection, prepaid
-engine, installation/QC workflow, and meter inventory are all planned but not yet built (see "Not
-yet built").
+**Scope**: this repository owns everything listed above end to end. It does **not** own real
+tariff rate/slab calculation (the prepaid module's daily billing uses a deliberately simplified
+flat rate × kWh placeholder, not a real tariff engine), postpaid billing determinant generation, a
+`wfm` work-order module, or any HES/meter-command integration (so RC/DC here is a status flag with
+confirmation gates, not a dispatched-and-acknowledged physical command). See "Not yet built" for
+the full list of gaps.
 
-**Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
-/ negative-consumption detection and data-quality holds, Daily Load Profile ingestion, VEE
-out-of-range checks and missing-interval estimation with an audit trail, meter master data with a
-temporal installation/replacement history, a `config` module (tariff categories, the electrical
-hierarchy, the organizational hierarchy), user/role records (data only, no auth/enforcement yet),
-a first `energy-audit` module (transparent supply-vs-consumption balance, no automated real-loss/
-coverage-loss split), a `complaints` ticket module with SLA tracking, meter inventory allocation
-and a three-level installation quality check (both backend-only — no frontend page yet), tenant
-scoping on every table, EF Core migrations, and 98 passing backend unit tests — plus a first
-working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with one page per backend
-module that has one. No auth, no billing module yet on either side. This is an early vertical
-slice, not a complete MDMS.
-
+**Current status**: backend domain + persistence covering Load Survey/Daily Load Profile
+ingestion with VEE (negative-consumption, out-of-range, and missing-interval estimation, all with
+an audit trail), meter master data with temporal installation/replacement history, a `config`
+module (tariff categories, the electrical hierarchy, the organizational hierarchy), user/role
+records (data only, no auth/enforcement yet), `energy-audit` (transparent supply-vs-consumption
+balance, no automated real-loss/coverage-loss split), `complaints` (SLA-tracked tickets), meter
+inventory allocation and a three-level installation quality check, `revenue-protection` (risk
+signals and an investigation lead workflow), a `prepaid` wallet (ledger-based, idempotent recharge
+and daily billing, connect/disconnect), tenant scoping on every table, EF Core migrations, and 111
+passing backend unit tests — plus a working **frontend** (`frontend/`, Next.js + MUI + TanStack
+Query) with a page for every module except meter inventory/installation QC. No authentication
+exists on either side yet. This is a broad-but-shallow vertical slice across most of the spec's
+modules, not a production-hardened system — see "Not yet built" for what's simplified or missing.
 ## Structure
 
 - `backend/` — .NET 8 solution (`MDMS.sln`) — see note on target framework below
@@ -82,6 +79,8 @@ calls it yet. A `Tenant` entity/table anchors the concept (one row today).
 | `MeterInventoryRecord` | A meter's WFM/inventory allocation state machine (Received → InStore → AssignedToContractor → AssignedToInstaller → Installed → Commissioned → Active, plus a replacement sub-flow) — deliberately separate from `Meter.Status`, which is just the meter's own simple master-data lifecycle |
 | `RevenueProtectionLead` | An investigation lead (Detected → Scored → Reviewed → Assigned → FieldInvestigation → FindingRecorded → ActionTaken → optionally RecoveryRecorded → Closed) — never a legal conclusion, per the spec's own caution |
 | `RiskSignal` | One observed risk indicator contributing to a lead's `RiskScore` — the weight is caller-supplied, never a hard-coded table, since "the actual weights must be calibrated by the utility" |
+| `PrepaidAccount` | A customer's prepaid wallet — balance is a denormalized read of its own ledger, never a bare mutable number |
+| `WalletTransaction` | One immutable, append-only ledger entry (Recharge / ConsumptionDebit / Adjustment), carrying the balance it produced and an idempotency `Reference` |
 | `InstallationQualityCheck` | The three-level installation quality check (Contractor L1 → Quality Incharge L2 → Utility Manager L3 → RMS sync → MIS onboarding). A rejection at L2 returns to L1Pending, at L3 to L2Pending — never all the way back to Draft |
 
 ### Load Survey ingestion
@@ -259,6 +258,28 @@ workflow — deliberately framed as investigation support, never a legal conclus
   `RecoveryRecorded`) is optional between ActionTaken and Closed — a field visit that turns out to
   be a false positive still needs a documented closure, not a forced recovery amount.
 
+### Prepaid
+
+`PrepaidController` (`/api/v1/prepaid`) implements a ledger-based prepaid wallet:
+
+- **Ledger-based, never a bare mutable balance** — `PrepaidAccount.Balance` only ever changes
+  through a method (`Recharge`, `DebitForConsumption`, `Adjust`) that also returns the
+  `WalletTransaction` recording it, carrying the resulting balance.
+- **Both mutating operations are idempotent** on a caller-supplied `Reference`:
+  `PrepaidService.RechargeAsync` returns the original transaction on a repeated reference (a
+  duplicated payment-gateway callback never double-credits), and `ProcessDailyBillingAsync` uses a
+  reference derived from `(customerId, date)` so re-running a day's billing is a safe no-op.
+  `WalletTransaction.Reference` also carries a DB-enforced unique constraint as a second layer.
+- Daily billing sums that day's Daily Load Profile consumption across every service point linked
+  to the customer and charges it at a **caller-supplied flat rate per kWh** — a deliberate
+  placeholder, not a real tariff engine (no slabs, categories, or ToD). A day with zero
+  consumption data returns `null`/`204` rather than fabricating a zero-consumption charge.
+  `DebitForConsumption` never rejects on insufficient balance — going negative/overdraft is a
+  utility policy decision, not this entity's to enforce.
+- **No HES/meter-command integration** — `Disconnect`/`Reconnect` only flip the account's own
+  status flag; there is no dispatched-and-acknowledged physical meter command here.
+  `Reconnect()` still requires a positive balance before it succeeds.
+
 ## Getting started
 
 ```bash
@@ -350,6 +371,12 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `GET /api/v1/revenue-protection/leads?status=` | List leads, highest risk first |
 | `GET /api/v1/revenue-protection/leads/{id}` | Full lead detail plus its raised signals |
 | `POST /api/v1/revenue-protection/leads/{id}/{review,assign,start-investigation,record-finding,record-action,record-recovery,close}` | Lead transitions, in order — `409` from the wrong status |
+| `GET /api/v1/prepaid/accounts/{customerId}` | Get a prepaid account |
+| `GET /api/v1/prepaid/accounts/{customerId}/transactions` | The account's ledger (most recent 500) |
+| `POST /api/v1/prepaid/recharge` | Idempotent recharge on `reference` — opens the account if it doesn't exist yet |
+| `POST /api/v1/prepaid/daily-billing` | Idempotent per `(customerId, date)`; `204` if there's no consumption data for that day |
+| `POST /api/v1/prepaid/accounts/{customerId}/disconnect` | Flip the account to disconnected — `409` if already disconnected |
+| `POST /api/v1/prepaid/accounts/{customerId}/reconnect` | Flip to connected — `409` if already connected or balance isn't positive |
 | `GET /swagger` | Interactive API docs (Development only) |
 
 **No authentication is wired up yet** — this is a local-development skeleton, not intended for
@@ -362,7 +389,7 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**98 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**111 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
 regression, idempotency (duplicate-in-batch and already-persisted duplicate), inline out-of-range
 flagging during LS ingestion (including that a flagged interval still anchors the next interval's
@@ -383,12 +410,15 @@ the installation quality check (full happy path to MisOnboarded, both rejection 
 at the correct level, and rejecting a blank note), and revenue-protection (score accumulation
 across multiple signals, the full lead lifecycle with and without a recorded recovery, that a
 second signal for the same customer joins the existing open lead rather than fragmenting it, and
-that a signal for a customer with only a Closed lead starts a fresh one).
+that a signal for a customer with only a Closed lead starts a fresh one), and the prepaid wallet
+(recharge/debit balance math, recharge idempotency on a repeated reference, daily-billing
+idempotency per customer/date, the no-consumption-data no-op, and the reconnect-requires-positive-
+balance rule).
 
 ## Frontend
 
 See [`frontend/README.md`](frontend/README.md) — Next.js + MUI + TanStack Query, one page per
-backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit, Complaints, Revenue Protection). No auth, no
+backend module (Meters, Meter Data, VEE, Config, Users, Energy Audit, Complaints, Revenue Protection, Prepaid). No auth, no
 charts yet, and no screens for modules that don't exist on the backend (revenue protection,
 prepaid, WFM, billing).
 
@@ -404,10 +434,14 @@ prepaid, WFM, billing).
 - Automated revenue-protection signal detection — today every `RiskSignal` is raised through the
   API by an operator/external process; nothing in MDMS itself analyzes consumption/tamper data
   and raises a signal on its own.
-- `prepaid` module: wallet/ledger, recharge idempotency, daily billing, disconnect/reconnect
-  command workflow with confirmation (not just "sent").
-- `billing` module: bill determinant generation (TOD/TOU slab mapping using `TariffCategory`) from
-  validated interval data.
+- A real tariff engine for prepaid daily billing — today's flat rate × kWh is a deliberate
+  placeholder; slabs, categories, and ToD mapping (using `TariffCategory`) don't feed into a charge
+  calculation yet, for prepaid or for a `billing` (postpaid bill determinant) module, which doesn't
+  exist at all.
+- A dispatched-and-acknowledged disconnect/reconnect command workflow — today's prepaid
+  `Disconnect`/`Reconnect` just flip a status flag; there's no HES/meter-command integration to
+  confirm a physical meter actually changed state (the spec's "sent isn't the same as completed"
+  principle isn't enforceable yet without that integration).
 - A `wfm` module proper (work-order assignment tying an installation/replacement to a contractor
   and installer end-to-end) — meter inventory and installation QC (see above) exist as their own
   state machines but nothing yet connects them into a work-order object. `Complaints` exists (see

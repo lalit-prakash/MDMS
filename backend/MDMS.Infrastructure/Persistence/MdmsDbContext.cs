@@ -29,6 +29,8 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<InstallationQualityCheck> InstallationQualityChecks => Set<InstallationQualityCheck>();
     public DbSet<RevenueProtectionLead> RevenueProtectionLeads => Set<RevenueProtectionLead>();
     public DbSet<RiskSignal> RiskSignals => Set<RiskSignal>();
+    public DbSet<PrepaidAccount> PrepaidAccounts => Set<PrepaidAccount>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -30,6 +30,8 @@ public interface IMdmsDbContext
     DbSet<InstallationQualityCheck> InstallationQualityChecks { get; }
     DbSet<RevenueProtectionLead> RevenueProtectionLeads { get; }
     DbSet<RiskSignal> RiskSignals { get; }
+    DbSet<PrepaidAccount> PrepaidAccounts { get; }
+    DbSet<WalletTransaction> WalletTransactions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
