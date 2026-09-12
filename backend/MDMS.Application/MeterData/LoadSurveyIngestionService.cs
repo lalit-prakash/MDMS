@@ -1,0 +1,114 @@
+using MDMS.Application.Common;
+using MDMS.Domain.Entities;
+using MDMS.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
+
+namespace MDMS.Application.MeterData;
+
+/// <summary>
+/// Validates and stores incoming Load Survey blocks. Applies the same sequence-continuity
+/// discipline prepaid_engine's own LS ingestion learned the hard way (see its README's
+/// "four real bugs" section): the last-known cumulative reading per meter is tracked across
+/// the whole in-flight batch, not just already-saved rows, so two blocks for the same meter in
+/// one request cannot both incorrectly come back Valid when the second is actually a
+/// negative-consumption event.
+/// </summary>
+public class LoadSurveyIngestionService
+{
+    private readonly IMdmsDbContext _db;
+
+    public LoadSurveyIngestionService(IMdmsDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task<IReadOnlyList<LoadSurveyIngestResult>> IngestAsync(
+        IReadOnlyList<LoadSurveyIngestRequest> requests, CancellationToken cancellationToken = default)
+    {
+        var results = new List<LoadSurveyIngestResult>();
+
+        // Seed "last known cumulative reading per meter" from persisted data, then keep it
+        // updated in-memory as this batch is processed — never re-querying only saved rows.
+        var meterIds = requests.Select(r => r.MeterId).Distinct().ToList();
+        var lastReadingByMeter = await _db.LoadSurveyIntervals
+            .Where(i => meterIds.Contains(i.MeterId) && i.Quality == MeasurementQuality.Valid)
+            .GroupBy(i => i.MeterId)
+            .Select(g => new { MeterId = g.Key, Last = g.OrderByDescending(i => i.IntervalEndUtc).First() })
+            .ToDictionaryAsync(x => x.MeterId, x => x.Last.CumulativeReading, cancellationToken);
+
+        var seenInBatch = new HashSet<(Guid MeterId, DateTime Start, DateTime End)>();
+
+        foreach (var request in requests.OrderBy(r => r.IntervalStartUtc))
+        {
+            var key = (request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc);
+            if (!seenInBatch.Add(key))
+            {
+                // Duplicate within the same batch — do not persist it a second time (the row it
+                // duplicates is already staged/saved), matching bug (1) fixed upstream.
+                continue;
+            }
+
+            var alreadyPersisted = await _db.LoadSurveyIntervals.AnyAsync(
+                i => i.MeterId == request.MeterId
+                     && i.IntervalStartUtc == request.IntervalStartUtc
+                     && i.IntervalEndUtc == request.IntervalEndUtc,
+                cancellationToken);
+            if (alreadyPersisted)
+                continue;
+
+            var hasPrior = lastReadingByMeter.TryGetValue(request.MeterId, out var priorReading);
+
+            if (hasPrior && request.CumulativeReading < priorReading)
+            {
+                var rejected = LoadSurveyInterval.CreateRejected(
+                    request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
+                    request.CumulativeReading, MeasurementQuality.NegativeConsumption);
+
+                await RaiseOrReactivateHoldAsync(request.MeterId,
+                    $"Negative consumption detected at interval {request.IntervalStartUtc:O}-{request.IntervalEndUtc:O} " +
+                    $"(reading {request.CumulativeReading} < prior {priorReading}).", cancellationToken);
+
+                _db.LoadSurveyIntervals.Add(rejected);
+                results.Add(new LoadSurveyIngestResult(
+                    request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
+                    rejected.Quality, rejected.Id));
+                continue;
+            }
+
+            var consumption = hasPrior ? request.CumulativeReading - priorReading : 0m;
+            var valid = LoadSurveyInterval.CreateValid(
+                request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
+                request.CumulativeReading, consumption, MeasurementSource.Received);
+
+            _db.LoadSurveyIntervals.Add(valid);
+            lastReadingByMeter[request.MeterId] = request.CumulativeReading;
+
+            results.Add(new LoadSurveyIngestResult(
+                request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
+                valid.Quality, valid.Id));
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return results;
+    }
+
+    private async Task RaiseOrReactivateHoldAsync(Guid meterId, string reason, CancellationToken cancellationToken)
+    {
+        var existing = await _db.DataQualityHolds
+            .Where(h => h.MeterId == meterId)
+            .OrderByDescending(h => h.RaisedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existing is { IsActive: true })
+            return; // already blocking this meter; no need to duplicate.
+
+        if (existing is not null)
+        {
+            existing.Reactivate(reason);
+        }
+        else
+        {
+            _db.DataQualityHolds.Add(DataQualityHold.Raise(meterId, reason));
+        }
+    }
+}
