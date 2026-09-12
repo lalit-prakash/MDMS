@@ -26,6 +26,8 @@ public interface IMdmsDbContext
     DbSet<VeeExecutionRecord> VeeExecutionRecords { get; }
     DbSet<NetworkEnergyReading> NetworkEnergyReadings { get; }
     DbSet<Complaint> Complaints { get; }
+    DbSet<MeterInventoryRecord> MeterInventoryRecords { get; }
+    DbSet<InstallationQualityCheck> InstallationQualityChecks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
