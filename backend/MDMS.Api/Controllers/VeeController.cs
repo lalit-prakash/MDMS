@@ -19,11 +19,14 @@ public class VeeController : ControllerBase
 {
     private readonly IMdmsDbContext _db;
     private readonly OutOfRangeValidationService _validationService;
+    private readonly MissingIntervalEstimationService _estimationService;
 
-    public VeeController(IMdmsDbContext db, OutOfRangeValidationService validationService)
+    public VeeController(
+        IMdmsDbContext db, OutOfRangeValidationService validationService, MissingIntervalEstimationService estimationService)
     {
         _db = db;
         _validationService = validationService;
+        _estimationService = estimationService;
     }
 
     [HttpGet("thresholds")]
@@ -109,5 +112,56 @@ public class VeeController : ControllerBase
                 p.Quality
             })
         });
+    }
+
+    /// <summary>
+    /// Detects the 30-minute LS slots missing for a meter/day (of the 48 expected) without
+    /// attempting to estimate anything.
+    /// </summary>
+    [HttpGet("estimation/ls/missing-slots")]
+    public async Task<IActionResult> GetMissingLoadSurveySlots(
+        [FromQuery] Guid meterId, [FromQuery] DateOnly date, CancellationToken ct)
+    {
+        var missing = await _estimationService.DetectMissingSlotsAsync(meterId, date, ct);
+        return Ok(missing.Select(s => new { s.Start, s.End }));
+    }
+
+    /// <summary>
+    /// Estimates every missing LS slot for a meter/day using the "average of surrounding periods"
+    /// method, where both immediate neighbors are available — a slot without both stays missing
+    /// and is recorded as such, never guessed at or treated as zero. Returns the audit trail for
+    /// every slot attempted.
+    /// </summary>
+    [HttpPost("estimation/ls/run")]
+    public async Task<IActionResult> RunLoadSurveyEstimation(
+        [FromQuery] Guid meterId, [FromQuery] DateOnly date, CancellationToken ct)
+    {
+        var records = await _estimationService.EstimateMissingSlotsAsync(meterId, date, ct);
+        return Ok(new
+        {
+            attemptedCount = records.Count,
+            estimatedCount = records.Count(r => r.ResultQuality == MeasurementQuality.Valid),
+            records = records.Select(r => new
+            {
+                r.Id,
+                r.SlotStartUtc,
+                r.SlotEndUtc,
+                r.ResultQuality,
+                r.NewValue,
+                r.Details
+            })
+        });
+    }
+
+    /// <summary>The VEE audit trail — every rule execution recorded, filterable by meter.</summary>
+    [HttpGet("execution-records")]
+    public async Task<IActionResult> ListExecutionRecords([FromQuery] Guid? meterId, CancellationToken ct)
+    {
+        var query = _db.VeeExecutionRecords.AsQueryable();
+        if (meterId.HasValue)
+            query = query.Where(r => r.MeterId == meterId.Value);
+
+        var records = await query.OrderByDescending(r => r.CreatedAtUtc).Take(500).ToListAsync(ct);
+        return Ok(records);
     }
 }
