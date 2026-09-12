@@ -34,6 +34,11 @@ const TILES = [
     title: "Energy Audit",
     description: "Network energy readings and transparent supply-vs-consumption balance.",
   },
+  {
+    href: "/complaints",
+    title: "Complaints",
+    description: "Consumer complaint tickets with SLA tracking through resolution and closure.",
+  },
 ];
 
 export default function HomePage() {

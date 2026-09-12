@@ -24,6 +24,7 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<VeeExecutionRecord> VeeExecutionRecords => Set<VeeExecutionRecord>();
     public DbSet<NetworkEnergyReading> NetworkEnergyReadings => Set<NetworkEnergyReading>();
+    public DbSet<Complaint> Complaints => Set<Complaint>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
