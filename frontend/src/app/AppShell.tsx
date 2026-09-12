@@ -11,6 +11,7 @@ const MODULES = [
   { label: "VEE", href: "/vee" },
   { label: "Config", href: "/config" },
   { label: "Users", href: "/users" },
+  { label: "Energy Audit", href: "/energy-audit" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

@@ -29,6 +29,11 @@ const TILES = [
     title: "Users",
     description: "User records, roles, and org-unit scoping (RBAC data — not yet enforced).",
   },
+  {
+    href: "/energy-audit",
+    title: "Energy Audit",
+    description: "Network energy readings and transparent supply-vs-consumption balance.",
+  },
 ];
 
 export default function HomePage() {
