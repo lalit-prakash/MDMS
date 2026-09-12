@@ -15,13 +15,14 @@ audit, revenue protection, prepaid engine, installation/QC workflow, meter inven
 complaints/ticketing are all planned but not yet built (see "Not yet built").
 
 **Current status**: backend domain + persistence + Load Survey ingestion with sequence-continuity
-/ negative-consumption detection and data-quality holds, Daily Load Profile ingestion, a
-configurable out-of-range VEE check (generalized as the first of possibly several stored VEE rule
-types), meter master data with a temporal installation/replacement history, a `config` module
-(tariff categories, the electrical hierarchy, the organizational hierarchy), user/role records
-(data only, no auth/enforcement yet), tenant scoping on every table, EF Core migrations, and 49
-passing unit tests. No frontend, no auth, no billing module yet. This is an early vertical slice,
-not a complete MDMS.
+/ negative-consumption detection and data-quality holds, Daily Load Profile ingestion, VEE
+out-of-range checks and missing-interval estimation with an audit trail, meter master data with a
+temporal installation/replacement history, a `config` module (tariff categories, the electrical
+hierarchy, the organizational hierarchy), user/role records (data only, no auth/enforcement yet),
+tenant scoping on every table, EF Core migrations, and 56 passing backend unit tests — plus a first
+working **frontend** (`frontend/`, Next.js + MUI + TanStack Query) with one page per backend
+module. No auth, no billing module yet on either side. This is an early vertical slice, not a
+complete MDMS.
 
 ## Structure
 
@@ -270,10 +271,15 @@ enforcement, `ServicePoint`-to-DT-node linking, `User` role/org-scope validation
 role requires an org unit), missing-slot detection, and missing-interval estimation (both the
 successful average-of-neighbors case and the "never guess without both neighbors" case).
 
+## Frontend
+
+See [`frontend/README.md`](frontend/README.md) — Next.js + MUI + TanStack Query, one page per
+backend module (Meters, Meter Data, VEE, Config, Users). No auth, no charts yet, and no screens
+for modules that don't exist on the backend (energy audit, revenue protection, prepaid, WFM,
+complaints).
+
 ## Not yet built
 
-- Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
-  first" preference.
 - A fuller VEE rules engine beyond negative-consumption, out-of-range, and average-of-neighbors
   missing-interval estimation (explicit timestamp/boundary validation, DLP-side missing-day
   estimation, provisional-DLP auto-creation, duplicate-message detection).
