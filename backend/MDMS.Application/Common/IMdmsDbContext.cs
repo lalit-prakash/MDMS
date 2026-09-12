@@ -28,6 +28,8 @@ public interface IMdmsDbContext
     DbSet<Complaint> Complaints { get; }
     DbSet<MeterInventoryRecord> MeterInventoryRecords { get; }
     DbSet<InstallationQualityCheck> InstallationQualityChecks { get; }
+    DbSet<RevenueProtectionLead> RevenueProtectionLeads { get; }
+    DbSet<RiskSignal> RiskSignals { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

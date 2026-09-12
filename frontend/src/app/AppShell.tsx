@@ -13,6 +13,7 @@ const MODULES = [
   { label: "Users", href: "/users" },
   { label: "Energy Audit", href: "/energy-audit" },
   { label: "Complaints", href: "/complaints" },
+  { label: "Revenue Protection", href: "/revenue-protection" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

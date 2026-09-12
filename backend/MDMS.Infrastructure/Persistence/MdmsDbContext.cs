@@ -27,6 +27,8 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<Complaint> Complaints => Set<Complaint>();
     public DbSet<MeterInventoryRecord> MeterInventoryRecords => Set<MeterInventoryRecord>();
     public DbSet<InstallationQualityCheck> InstallationQualityChecks => Set<InstallationQualityCheck>();
+    public DbSet<RevenueProtectionLead> RevenueProtectionLeads => Set<RevenueProtectionLead>();
+    public DbSet<RiskSignal> RiskSignals => Set<RiskSignal>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
