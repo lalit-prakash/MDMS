@@ -12,11 +12,16 @@ public class MeterDataController : ControllerBase
 {
     private readonly IMdmsDbContext _db;
     private readonly LoadSurveyIngestionService _ingestionService;
+    private readonly DailyLoadProfileIngestionService _dlpIngestionService;
 
-    public MeterDataController(IMdmsDbContext db, LoadSurveyIngestionService ingestionService)
+    public MeterDataController(
+        IMdmsDbContext db,
+        LoadSurveyIngestionService ingestionService,
+        DailyLoadProfileIngestionService dlpIngestionService)
     {
         _db = db;
         _ingestionService = ingestionService;
+        _dlpIngestionService = dlpIngestionService;
     }
 
     [HttpPost("ls")]
@@ -43,6 +48,37 @@ public class MeterDataController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(intervals);
+    }
+
+    [HttpPost("dlp")]
+    public async Task<IActionResult> IngestDailyLoadProfile(
+        [FromBody] DailyLoadProfileIngestRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _dlpIngestionService.IngestAsync(request, ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // A received DLP already exists for this meter/date — never silently overwritten.
+            return Conflict(ex.Message);
+        }
+    }
+
+    [HttpGet("dlp")]
+    public async Task<IActionResult> ListDailyLoadProfiles([FromQuery] Guid? meterId, CancellationToken ct)
+    {
+        var query = _db.DailyLoadProfiles.AsQueryable();
+        if (meterId.HasValue)
+            query = query.Where(p => p.MeterId == meterId.Value);
+
+        var profiles = await query
+            .OrderByDescending(p => p.ProfileDate)
+            .Take(500)
+            .ToListAsync(ct);
+
+        return Ok(profiles);
     }
 
     [HttpGet("billing-holds")]

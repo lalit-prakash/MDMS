@@ -61,6 +61,17 @@ Bumping every `<TargetFramework>` to `net10.0` and the EF Core/Npgsql package ve
 - A bad item never fails the rest of the batch — matches `prepaid_engine`'s established batch
   pattern (see its conversions/billing-holds-clear-bulk endpoints).
 
+### Daily Load Profile ingestion
+
+`DailyLoadProfileIngestionService.IngestAsync` mirrors `prepaid_engine`'s own DLP behavior
+("replaces a provisional profile if one exists"):
+
+- No existing profile for that `ServicePointId + MeterId + ProfileDate` → stores it as `Received`.
+- An existing **provisional** (`Estimated`/`Missing`) profile for that key → replaced by the real
+  `Received` one; the provisional row is not left behind.
+- An existing **`Received`** profile for that key → rejected (`409 Conflict`) rather than
+  overwritten — a genuine received value is never silently replaced.
+
 ## Compatibility & boundary with prepaid_engine
 
 `prepaid_engine` (.NET 8, PostgreSQL, 317 tests, real Angular frontend) currently does its own
@@ -134,6 +145,8 @@ dotnet tool run dotnet-ef migrations add <Name> \
 | `GET /api/v1/meters/replacements` | Full meter replacement history, cross-meter |
 | `POST /api/v1/meter-data/ls` | Ingest a batch of 30-minute LS blocks |
 | `GET /api/v1/meter-data/ls?meterId=` | Recent LS intervals (capped at 500), optionally filtered by meter |
+| `POST /api/v1/meter-data/dlp` | Ingest one Daily Load Profile (replaces a provisional profile if one exists; `409` if a received one already exists for that meter/date) |
+| `GET /api/v1/meter-data/dlp?meterId=` | Recent Daily Load Profiles (capped at 500), optionally filtered by meter |
 | `GET /api/v1/meter-data/billing-holds?activeOnly=` | Data-quality holds |
 | `POST /api/v1/meter-data/{meterId}/billing-hold/clear` | Clear an active hold with a mandatory resolution note |
 | `GET /swagger` | Interactive API docs (Development only) |
@@ -148,17 +161,17 @@ cd backend
 dotnet test MDMS.sln
 ```
 
-**6 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
+**9 tests, all passing** — covering LS ingestion's happy path, consumption-delta calculation,
 negative-consumption rejection + hold creation, the in-batch negative-consumption detection
-regression, and idempotency (duplicate-in-batch and already-persisted duplicate).
+regression, idempotency (duplicate-in-batch and already-persisted duplicate), and DLP ingestion
+(new profile, provisional replacement, and rejecting an overwrite of a received profile).
 
 ## Not yet built
 
 - Frontend (Next.js/React/MUI/TanStack Query/ECharts) — deliberately deferred per your "backend
   first" preference.
-- `DailyLoadProfile` ingestion endpoint (the entity/domain logic exists; no controller yet).
 - A real VEE rules engine beyond negative-consumption detection (out-of-range checks, estimation
-  scheduling).
+  scheduling, provisional-DLP auto-creation when a day's profile never arrives).
 - The `IMeterDataClient`-style integration port on the `prepaid_engine` side.
 - Authentication/authorization.
 - Seed data / demo data.
