@@ -1,0 +1,125 @@
+MDMS — MANUAL SERVER STARTUP GUIDE
+====================================
+
+This is for running the backend and frontend yourself, outside of Claude Code's
+preview tooling (e.g. in your own terminal, or after a machine restart).
+
+Repo root: C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo
+
+
+PREREQUISITES (one-time)
+-------------------------
+1. .NET 8 SDK installed.
+2. Node.js (v20+) and npm installed.
+3. PostgreSQL running locally, with a database named "mdms" and a user matching
+   backend/MDMS.Api/appsettings.json's ConnectionStrings:Mdms value (default:
+   Host=localhost;Port=5432;Database=mdms;Username=postgres;Password=CHANGE_ME
+   — replace CHANGE_ME with your actual local Postgres password, or set it via
+   user-secrets / an environment variable instead of editing the file directly).
+
+
+1. START THE BACKEND API
+-------------------------
+Open a terminal:
+
+    cd C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo\backend
+    dotnet run --project MDMS.Api --urls http://localhost:5004
+
+What this does automatically (Development environment only):
+  - Applies any pending EF Core migrations to your local Postgres database.
+  - Enables Swagger UI at http://localhost:5004/swagger
+  - Enables a permissive CORS policy for http://localhost:3000 (the frontend).
+
+Wait for this line before continuing:
+    Now listening on: http://localhost:5004
+
+Verify it's healthy (in a second terminal, or a browser tab):
+    curl http://localhost:5004/health
+    -> should return: {"status":"Healthy"}
+
+Leave this terminal running. Press Ctrl+C in it to stop the API.
+
+
+2. START THE FRONTEND (Next.js dev server)
+--------------------------------------------
+Open a second terminal:
+
+    cd C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo\frontend
+    npm install        (only needed the first time, or after pulling dependency changes)
+    npm run dev
+
+Wait for:
+    Local:  http://localhost:3000
+
+Open http://localhost:3000 in your browser.
+
+Leave this terminal running. Press Ctrl+C in it to stop the frontend.
+
+
+3. SIGNING IN
+--------------
+There is no seeded default account. To get in the first time:
+
+  a) If no user exists at all, create one via the API directly (Swagger UI at
+     http://localhost:5004/swagger, under UsersController -> POST /api/v1/users
+     — note this endpoint requires an Admin-authenticated caller once at least
+     one Admin account already exists; the very first account in a brand new
+     database can be inserted directly via Swagger only while no auth
+     middleware blocks it, or by a developer inserting a row directly).
+
+  b) Once a username exists in the Users module, go to
+     http://localhost:3000/login and click "First time signing in? Claim your
+     account" — enter that username and choose a password. This calls
+     POST /api/v1/auth/claim, which only works once per account (before it has
+     a password set).
+
+  c) After that, sign in normally with that username/password at /login.
+
+Already-created account from this session (if the database hasn't been reset):
+    Username: lalit.prakash
+    Password: Test@123
+    Role:     Admin
+
+
+4. STOPPING EVERYTHING
+------------------------
+Press Ctrl+C in each terminal window (backend and frontend separately).
+
+If a backend process gets orphaned (e.g. a terminal was closed without
+Ctrl+C) and port 5004 is already in use on your next `dotnet run`, find and
+stop it first. In PowerShell:
+
+    Get-Process MDMS.Api -ErrorAction SilentlyContinue | Stop-Process -Force
+
+Then re-run step 1.
+
+
+5. COMMON PROBLEMS
+--------------------
+"Port 5004 already in use"
+  -> Another MDMS.Api process is still running. See step 4 above.
+
+"Port 3000 already in use"
+  -> Another Next.js dev server is still running. Stop it (Ctrl+C in its
+     terminal, or `Get-Process node | Stop-Process -Force` as a last resort —
+     this kills ALL Node processes, so prefer closing the specific terminal).
+
+Frontend loads but every page shows "could not reach the backend API"
+  -> The backend (step 1) isn't running, or isn't reachable at
+     http://localhost:5004. Check its terminal for errors, and that
+     Postgres itself is running.
+
+Login says "No MDMS user account found with that username"
+  -> That username doesn't exist in the Users module yet. See step 3.
+
+"This account already has a password set. Use Sign in instead."
+  -> You already claimed this account previously; use the normal Sign In
+     form instead of "Claim your account".
+
+Stale-looking frontend after pulling new code / switching branches
+  -> Stop the frontend (Ctrl+C), delete the .next folder, then `npm run dev`
+     again:
+         cd C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo\frontend
+         rmdir /s /q .next          (Command Prompt)
+         Remove-Item -Recurse -Force .next   (PowerShell)
+         npm run dev
