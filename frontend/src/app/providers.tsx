@@ -1,42 +1,39 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
-import { useState } from "react";
+import { ThemeProvider, CssBaseline } from "@mui/material";
+import { useMemo, useState } from "react";
+import { ThemeModeProvider, useThemeMode } from "@/lib/theme/ThemeModeContext";
+import { buildMuiTheme } from "@/lib/theme/muiTheme";
 
-// Shared color language for data-quality/status across the app — one place to change, not
-// per-screen constants. Matches the spec's own instruction to define this as shared tokens.
-export const qualityColor = {
-  Valid: "#2e7d32",
-  Received: "#2e7d32",
-  Estimated: "#ed6c02",
-  Edited: "#0288d1",
-  Calculated: "#7b1fa2",
-  NegativeConsumption: "#d32f2f",
-  OutOfRange: "#ed6c02",
-  Missing: "#9e9e9e",
-  Suspect: "#d32f2f",
-} as const;
+function MuiThemeBridge({ children }: { children: React.ReactNode }) {
+  // Bridges our own ThemeModeContext (which owns the persisted light/dark choice and the
+  // [data-theme] attribute) into MUI's ThemeProvider — one token source of truth
+  // (globals.css custom properties), never a second hard-coded MUI palette.
+  const { mode } = useThemeMode();
+  const theme = useMemo(() => buildMuiTheme(mode), [mode]);
 
-const theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: { main: "#0f5fa8" },
-  },
-  shape: { borderRadius: 8 },
-});
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {children}
+    </ThemeProvider>
+  );
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
-  }));
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+      })
+  );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </ThemeProvider>
+      <ThemeModeProvider>
+        <MuiThemeBridge>{children}</MuiThemeBridge>
+      </ThemeModeProvider>
     </QueryClientProvider>
   );
 }

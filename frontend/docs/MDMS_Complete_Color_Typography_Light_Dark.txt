@@ -1,0 +1,2049 @@
+MDMS
+COMPLETE COLOR & TYPOGRAPHY DESIGN SYSTEM
+LIGHT MODE + DARK MODE
+Version 2.0
+
+============================================================
+1. PURPOSE
+============================================================
+
+This document defines the visual design system for an enterprise
+Meter Data Management System (MDMS), including:
+
+- Meter management
+- Consumer management
+- Head-end / AMI operations
+- Load Survey (LS)
+- Daily Load Profile (DLP)
+- Validation, Estimation & Editing (VEE)
+- Energy audit
+- Revenue protection
+- Prepaid engine
+- Recharge and balance operations
+- Billing-related data
+- Reports and analytics
+- System monitoring
+- Operational dashboards
+
+The design language should feel:
+
+- Enterprise
+- Reliable
+- Technical
+- Premium
+- Calm
+- Data-focused
+- Highly readable
+- Suitable for long operational sessions
+
+PRIMARY UI STRATEGY:
+
+LIGHT MODE:
+Default working environment for most users.
+
+DARK MODE:
+Optional professional operating environment for users who
+prefer dark interfaces or work in low-light environments.
+
+Both modes use the same brand identity and semantic colors.
+Only surface, text, border and interaction tokens change.
+
+============================================================
+2. CORE DESIGN PRINCIPLES
+============================================================
+
+1. Color communicates meaning.
+2. Typography communicates hierarchy.
+3. Spacing communicates structure.
+4. Surface elevation communicates depth.
+5. Semantic colors are reserved for operational meaning.
+6. Avoid unnecessary visual noise.
+7. Do not use color as the only status indicator.
+8. Tables and operational data must remain highly readable.
+9. Primary actions must be visually obvious.
+10. Light and dark themes must feel like the same product.
+
+The interface should NOT look like a generic admin dashboard.
+
+It should look like a specialized energy operations platform.
+
+============================================================
+3. BRAND COLOR FOUNDATION
+============================================================
+
+The brand foundation comes from the following reference palette:
+
+Navy 950:
+#06141B
+
+Navy 900:
+#11212D
+
+Slate 800:
+#253745
+
+Slate 600:
+#4A5C6A
+
+Gray 400:
+#9BA8AB
+
+Gray 200:
+#CCD0CF
+
+These colors remain the identity of the product.
+
+In LIGHT MODE, navy/slate colors are primarily used for:
+- Navigation
+- Text
+- Buttons
+- Icons
+- Accents
+- Structural elements
+
+In DARK MODE, navy/slate colors become:
+- Page backgrounds
+- Navigation
+- Cards
+- Panels
+- Inputs
+- Elevated surfaces
+
+============================================================
+4. LIGHT MODE - COMPLETE COLOR SYSTEM
+============================================================
+
+4.1 APPLICATION BACKGROUND
+
+Primary page background:
+#F5F7F8
+
+RGB:
+245, 247, 248
+
+Usage:
+- Main application canvas
+- Dashboard background
+- Report pages
+- Empty page areas
+
+------------------------------------------------------------
+
+4.2 SIDEBAR
+
+Recommended default:
+#06141B
+
+Sidebar text:
+#CCD0CF
+
+Sidebar secondary text:
+#9BA8AB
+
+Sidebar inactive icon:
+#9BA8AB
+
+Sidebar hover:
+#11212D
+
+Sidebar active:
+#253745
+
+Sidebar active text:
+#FFFFFF
+
+Sidebar active indicator:
+#2DD4BF
+
+This dark sidebar preserves the original brand identity.
+
+------------------------------------------------------------
+
+4.3 HEADER
+
+Header background:
+#FFFFFF
+
+Header text:
+#11212D
+
+Header secondary text:
+#4A5C6A
+
+Header icon:
+#4A5C6A
+
+Header icon hover:
+#06141B
+
+Header border:
+#D9E0E3
+
+------------------------------------------------------------
+
+4.4 CARDS
+
+Card background:
+#FFFFFF
+
+Card hover:
+#F1F4F5
+
+Card border:
+#D9E0E3
+
+Card title:
+#11212D
+
+Card body:
+#4A5C6A
+
+Card muted text:
+#6F7D83
+
+Card important metric:
+#06141B
+
+------------------------------------------------------------
+
+4.5 SURFACE LEVELS
+
+Light Mode:
+
+Level 0:
+#F5F7F8
+Application background.
+
+Level 1:
+#FFFFFF
+Cards, panels, tables, header.
+
+Level 2:
+#F1F4F5
+Hover and selected states.
+
+Level 3:
+#E8EDF0
+Strong hover / active background.
+
+Level 4:
+Use shadow + border rather than introducing many colors.
+
+Do not create dozens of nearly identical grays.
+
+============================================================
+5. DARK MODE - COMPLETE COLOR SYSTEM
+============================================================
+
+5.1 APPLICATION BACKGROUND
+
+Primary page background:
+#06141B
+
+------------------------------------------------------------
+
+5.2 SIDEBAR
+
+Sidebar background:
+#06141B
+
+Sidebar text:
+#CCD0CF
+
+Sidebar secondary:
+#9BA8AB
+
+Sidebar hover:
+#11212D
+
+Sidebar active:
+#253745
+
+Sidebar active indicator:
+#2DD4BF
+
+------------------------------------------------------------
+
+5.3 HEADER
+
+Header background:
+#11212D
+
+Header text:
+#CCD0CF
+
+Header secondary:
+#9BA8AB
+
+Header icon:
+#9BA8AB
+
+Header icon hover:
+#CCD0CF
+
+Header border:
+rgba(155,168,171,0.18)
+
+------------------------------------------------------------
+
+5.4 CARDS
+
+Card background:
+#253745
+
+Card hover:
+#304553
+
+Card border:
+rgba(155,168,171,0.18)
+
+Card title:
+#CCD0CF
+
+Card body:
+#9BA8AB
+
+Card muted:
+#7F8D91
+
+Card primary metric:
+#CCD0CF
+
+------------------------------------------------------------
+
+5.5 DARK SURFACE LEVELS
+
+Level 0:
+#06141B
+
+Level 1:
+#11212D
+
+Level 2:
+#253745
+
+Level 3:
+#304553
+
+Level 4:
+Use shadow/overlay and restrained border.
+
+============================================================
+6. MASTER COLOR TOKEN SYSTEM
+============================================================
+
+These semantic tokens should be used in application code.
+
+LIGHT MODE:
+
+--color-bg-app: #F5F7F8
+--color-bg-sidebar: #06141B
+--color-bg-header: #FFFFFF
+--color-bg-surface: #FFFFFF
+--color-bg-surface-hover: #F1F4F5
+--color-bg-surface-active: #E8EDF0
+--color-bg-input: #FFFFFF
+
+--color-text-primary: #11212D
+--color-text-secondary: #4A5C6A
+--color-text-muted: #6F7D83
+--color-text-disabled: #9BA8AB
+--color-text-inverse: #FFFFFF
+
+--color-border-default: #D9E0E3
+--color-border-subtle: #E5EAED
+--color-border-strong: #B8C3C8
+
+--color-brand-primary: #06141B
+--color-brand-secondary: #11212D
+--color-brand-accent: #0F9F91
+
+DARK MODE:
+
+--color-bg-app: #06141B
+--color-bg-sidebar: #06141B
+--color-bg-header: #11212D
+--color-bg-surface: #253745
+--color-bg-surface-hover: #304553
+--color-bg-surface-active: #344B5B
+--color-bg-input: #11212D
+
+--color-text-primary: #CCD0CF
+--color-text-secondary: #9BA8AB
+--color-text-muted: #7F8D91
+--color-text-disabled: #56666D
+--color-text-inverse: #06141B
+
+--color-border-default: rgba(155,168,171,0.18)
+--color-border-subtle: rgba(155,168,171,0.12)
+--color-border-strong: rgba(204,208,207,0.28)
+
+--color-brand-primary: #CCD0CF
+--color-brand-secondary: #9BA8AB
+--color-brand-accent: #2DD4BF
+
+============================================================
+7. SEMANTIC COLORS
+============================================================
+
+Semantic colors remain consistent across both themes.
+
+SUCCESS
+
+Primary:
+#3FB950
+
+Bright:
+#56D364
+
+Light Mode soft background:
+#EAF7EE
+
+Dark Mode soft background:
+#183A2A
+
+Usage:
+- Healthy meter
+- Successful communication
+- VEE passed
+- Successful recharge
+- Completed process
+- Normal operational state
+
+------------------------------------------------------------
+
+WARNING
+
+Primary:
+#D29922
+
+Bright:
+#E3B341
+
+Light Mode soft background:
+#FFF6DD
+
+Dark Mode soft background:
+#3A2E12
+
+Usage:
+- Low balance
+- Missing data
+- VEE warning
+- Communication degradation
+- Pending attention
+- Threshold approaching
+
+------------------------------------------------------------
+
+ERROR
+
+Primary:
+#D73A49
+
+Bright:
+#F85149
+
+Light Mode soft background:
+#FDECEC
+
+Dark Mode soft background:
+#42181A
+
+Usage:
+- Failed transaction
+- Meter failure
+- VEE rejection
+- Critical communication failure
+- Revenue protection alert
+- Destructive action
+
+------------------------------------------------------------
+
+INFO
+
+Primary:
+#0969DA
+
+Bright:
+#58A6FF
+
+Light Mode soft background:
+#EAF3FF
+
+Dark Mode soft background:
+#132D46
+
+Usage:
+- Information
+- Processing
+- Synchronization
+- System notifications
+- Informational status
+
+------------------------------------------------------------
+
+ENERGY / PRODUCT ACCENT
+
+Light Mode:
+#0F9F91
+
+Dark Mode:
+#2DD4BF
+
+Soft Light:
+#E4F7F4
+
+Soft Dark:
+#123B3A
+
+Usage:
+- Energy analytics
+- Active selections
+- Smart meter highlights
+- Key charts
+- Primary product accent
+
+Do not turn the entire UI teal.
+
+============================================================
+8. LIGHT VS DARK SEMANTIC TOKEN MAP
+============================================================
+
+SUCCESS:
+Light text/icon: #16803C
+Dark text/icon: #56D364
+
+WARNING:
+Light text/icon: #9A6700
+Dark text/icon: #E3B341
+
+ERROR:
+Light text/icon: #CF222E
+Dark text/icon: #FF7B72
+
+INFO:
+Light text/icon: #0969DA
+Dark text/icon: #79C0FF
+
+ACCENT:
+Light: #0F766E
+Dark: #5EEAD4
+
+Important:
+Use darker semantic colors on light backgrounds for contrast.
+Use brighter semantic colors on dark backgrounds.
+
+============================================================
+9. TYPOGRAPHY - FONT FAMILIES
+============================================================
+
+PRIMARY FONT:
+
+Roboto Flex
+
+Recommended use:
+- Application UI
+- Page titles
+- Navigation
+- Cards
+- Forms
+- Tables
+- Dashboard metrics
+- Buttons
+- Reports
+
+Why:
+- Variable font
+- Excellent readability
+- Professional appearance
+- Flexible weight/width control
+- Strong enterprise UI characteristics
+
+------------------------------------------------------------
+
+TECHNICAL FONT:
+
+Roboto Mono
+
+Use for:
+- Meter numbers
+- Consumer numbers
+- Meter serial numbers
+- Transaction IDs
+- Device IDs
+- API IDs
+- Raw readings
+- Technical codes
+- Timestamps where alignment matters
+
+------------------------------------------------------------
+
+MULTILINGUAL / FALLBACK:
+
+Noto Sans
+
+Use for:
+- Multilingual content
+- Scripts requiring fallback support
+- Internationalized UI
+- Fallback when Roboto Flex does not support a required glyph
+
+============================================================
+10. FONT STACKS
+============================================================
+
+Primary:
+
+"Roboto Flex", "Noto Sans", system-ui, -apple-system,
+"Segoe UI", sans-serif
+
+Technical:
+
+"Roboto Mono", "SFMono-Regular", Consolas,
+"Liberation Mono", monospace
+
+Fallback:
+
+"Noto Sans", system-ui, -apple-system,
+"Segoe UI", sans-serif
+
+============================================================
+11. ROBOTO FLEX VARIABLE AXES
+============================================================
+
+CORE AXES:
+
+Slant
+Width
+Weight
+Grade
+Optical Size
+
+ADVANCED AXES:
+
+XOPQ - Thick Stroke
+YOPQ - Thin Stroke
+XTRA - Counter Width
+YTUC - Uppercase Height
+YTLC - Lowercase Height
+YTAS - Ascender Height
+YTDE - Descender Depth
+YTFI - Figure Height
+
+------------------------------------------------------------
+
+PRODUCTION RECOMMENDATION:
+
+Use primarily:
+
+Weight
+Grade
+Width
+Optical Size
+
+Use advanced axes only when a specific visual requirement exists.
+
+Do not independently manipulate advanced axes across every
+component. This creates an inconsistent typographic system.
+
+============================================================
+12. TYPOGRAPHY SCALE
+============================================================
+
+DISPLAY XL
+64px
+Line height: 1.05
+Weight: 600
+Use:
+- Large landing/dashboard moments
+- Exceptional KPI screens
+
+DISPLAY
+48px
+Line height: 1.10
+Weight: 600
+Use:
+- Large metrics
+- High-level dashboard numbers
+
+H1 / PAGE TITLE
+32px
+Line height: 1.20
+Weight: 600
+Use:
+- Page title
+
+H2 / SECTION
+24px
+Line height: 1.25
+Weight: 600
+Use:
+- Major sections
+
+H3 / CARD TITLE
+18px
+Line height: 1.35
+Weight: 600
+Use:
+- Card title
+- Widget title
+
+BODY LARGE
+16px
+Line height: 1.50
+Weight: 400
+Use:
+- Important explanatory text
+
+BODY
+14px
+Line height: 1.50
+Weight: 400
+Use:
+- Default application content
+
+BODY SMALL
+13px
+Line height: 1.45
+Weight: 400
+Use:
+- Dense UI
+- Secondary content
+
+CAPTION
+12px
+Line height: 1.40
+Weight: 400
+Use:
+- Metadata
+- Helper information
+
+MICRO
+11px
+Line height: 1.30
+Weight: 500
+Use:
+- Compact status labels
+- Table metadata
+- Small annotations
+
+============================================================
+13. FONT WEIGHT SYSTEM
+============================================================
+
+300:
+Rare.
+Large secondary display text only.
+
+400:
+Default body text.
+
+450:
+Optional intermediate weight for dense interfaces.
+
+500:
+Labels, navigation, table headers, metadata.
+
+600:
+Headings, important values, active navigation.
+
+650:
+Strong KPI emphasis when needed.
+
+700:
+Rare.
+Use only for exceptional emphasis.
+
+800:
+Avoid in normal application UI.
+
+DEFAULT PRODUCT RANGE:
+
+400 / 500 / 600
+
+This keeps the product visually consistent.
+
+============================================================
+14. GRADE SYSTEM
+============================================================
+
+Grade changes perceived stroke density without substantially
+changing layout.
+
+Recommended:
+
+Body:
+Grade 0
+
+Small text:
+Grade 0 to slightly positive
+
+Dark mode small text:
+Slightly positive grade if needed for readability
+
+Headings:
+Grade 0
+
+Large metrics:
+Grade 0 to slightly positive
+
+Do not use grade as a substitute for proper contrast.
+
+============================================================
+15. OPTICAL SIZE
+============================================================
+
+Use automatic optical sizing where supported:
+
+font-optical-sizing: auto;
+
+Concept:
+
+Small text:
+Optimize for text size.
+
+Body:
+Normal optical size.
+
+Large headings:
+Display optical treatment.
+
+Optical size should support readability rather than become
+a visible stylistic effect.
+
+============================================================
+16. TYPOGRAPHY COLOR HIERARCHY
+============================================================
+
+LIGHT MODE:
+
+Primary:
+#11212D
+
+Secondary:
+#4A5C6A
+
+Muted:
+#6F7D83
+
+Disabled:
+#9BA8AB
+
+Inverse:
+#FFFFFF
+
+DARK MODE:
+
+Primary:
+#CCD0CF
+
+Secondary:
+#9BA8AB
+
+Muted:
+#7F8D91
+
+Disabled:
+#56666D
+
+Inverse:
+#06141B
+
+Never use pure black as normal text on the light UI.
+
+Avoid pure white as default text in dark mode.
+
+============================================================
+17. DASHBOARD TYPOGRAPHY
+============================================================
+
+PAGE TITLE:
+32px / 600
+
+SUBTITLE:
+14px / 400
+
+KPI NUMBER:
+32px to 40px / 600
+
+KPI LABEL:
+12px / 500
+
+KPI COMPARISON:
+12px / 500
+
+CHART TITLE:
+14px / 600
+
+CHART AXIS:
+11px / 400
+
+CHART TOOLTIP:
+12px / 500
+
+TABLE HEADER:
+12px / 600
+
+TABLE BODY:
+13px / 400 or 500
+
+============================================================
+18. MDMS-SPECIFIC DATA TYPOGRAPHY
+============================================================
+
+Meter Number:
+Roboto Mono
+13px / 500
+
+Consumer Number:
+Roboto Mono
+13px / 500
+
+Meter Serial:
+Roboto Mono
+12px / 500
+
+Transaction ID:
+Roboto Mono
+12px / 400
+
+Device ID:
+Roboto Mono
+12px / 500
+
+Timestamp:
+Roboto Mono
+12px / 400
+
+Energy Reading:
+Roboto Mono
+14px / 500
+
+Large Energy KPI:
+Roboto Flex
+32px / 600
+
+Unit:
+Roboto Flex
+12px / 500
+
+Example:
+
+2,481.72
+kWh
+
+2,481.72:
+Roboto Flex / 32px / 600
+
+kWh:
+Roboto Flex / 12px / 500
+
+============================================================
+19. LIGHT MODE COMPONENT SPECIFICATION
+============================================================
+
+BUTTONS
+
+PRIMARY:
+Background: #06141B
+Text: #FFFFFF
+Hover: #11212D
+Active: #253745
+
+SECONDARY:
+Background: #FFFFFF
+Text: #11212D
+Border: #B8C3C8
+Hover: #F1F4F5
+
+GHOST:
+Background: transparent
+Text: #4A5C6A
+Hover: #F1F4F5
+Hover text: #11212D
+
+DANGER:
+Background: #D73A49
+Text: #FFFFFF
+Hover: #CF222E
+
+------------------------------------------------------------
+
+INPUTS
+
+Background:
+#FFFFFF
+
+Border:
+#B8C3C8
+
+Text:
+#11212D
+
+Placeholder:
+#6F7D83
+
+Focus:
+#0969DA
+
+Focus ring:
+rgba(9,105,218,0.18)
+
+Error:
+#D73A49
+
+Success:
+#16803C
+
+Disabled:
+#F1F4F5
+
+------------------------------------------------------------
+
+TABLES
+
+Container:
+#FFFFFF
+
+Header:
+#F5F7F8
+
+Header text:
+#4A5C6A
+
+Body:
+#11212D
+
+Secondary cell:
+#4A5C6A
+
+Divider:
+#E5EAED
+
+Hover:
+#F1F4F5
+
+Selected:
+#EAF3FF
+
+------------------------------------------------------------
+
+MODALS
+
+Background:
+#FFFFFF
+
+Overlay:
+rgba(6,20,27,0.45)
+
+Title:
+#11212D
+
+Body:
+#4A5C6A
+
+Border:
+#D9E0E3
+
+============================================================
+20. DARK MODE COMPONENT SPECIFICATION
+============================================================
+
+BUTTONS
+
+PRIMARY:
+Background: #CCD0CF
+Text: #06141B
+Hover: #FFFFFF
+Active: #B9C0BF
+
+SECONDARY:
+Background: #253745
+Text: #CCD0CF
+Border: #4A5C6A
+Hover: #304553
+
+GHOST:
+Background: transparent
+Text: #9BA8AB
+Hover: #253745
+Hover text: #CCD0CF
+
+DANGER:
+Background: #F85149
+Text: #06141B
+Hover: #FF7B72
+
+------------------------------------------------------------
+
+INPUTS
+
+Background:
+#11212D
+
+Border:
+#4A5C6A
+
+Text:
+#CCD0CF
+
+Placeholder:
+#9BA8AB
+
+Focus:
+#58A6FF
+
+Focus ring:
+rgba(88,166,255,0.25)
+
+Error:
+#F85149
+
+Success:
+#3FB950
+
+Disabled:
+#253745
+
+------------------------------------------------------------
+
+TABLES
+
+Container:
+#253745
+
+Header:
+#11212D
+
+Header text:
+#9BA8AB
+
+Body:
+#CCD0CF
+
+Secondary:
+#9BA8AB
+
+Divider:
+rgba(155,168,171,0.14)
+
+Hover:
+#304553
+
+Selected:
+#132D46
+
+------------------------------------------------------------
+
+MODALS
+
+Background:
+#253745
+
+Overlay:
+rgba(0,0,0,0.55)
+
+Title:
+#CCD0CF
+
+Body:
+#9BA8AB
+
+Border:
+rgba(155,168,171,0.18)
+
+============================================================
+21. SIDEBAR DESIGN
+============================================================
+
+LIGHT MODE:
+Sidebar remains dark.
+
+Background:
+#06141B
+
+Primary text:
+#CCD0CF
+
+Secondary:
+#9BA8AB
+
+Hover:
+#11212D
+
+Active:
+#253745
+
+Active indicator:
+#2DD4BF
+
+DARK MODE:
+Same sidebar system.
+
+This creates brand continuity between themes.
+
+Navigation typography:
+14px / 500
+
+Active:
+14px / 600
+
+Group label:
+11px / 600
+
+Metadata:
+12px / 400
+
+Do not make every menu item bold.
+
+============================================================
+22. STATUS BADGES
+============================================================
+
+LIGHT MODE:
+
+SUCCESS:
+Background #EAF7EE
+Text #16803C
+
+WARNING:
+Background #FFF6DD
+Text #9A6700
+
+ERROR:
+Background #FDECEC
+Text #CF222E
+
+INFO:
+Background #EAF3FF
+Text #0969DA
+
+NEUTRAL:
+Background #F1F4F5
+Text #4A5C6A
+
+DARK MODE:
+
+SUCCESS:
+Background #183A2A
+Text #56D364
+
+WARNING:
+Background #3A2E12
+Text #E3B341
+
+ERROR:
+Background #42181A
+Text #FF7B72
+
+INFO:
+Background #132D46
+Text #79C0FF
+
+NEUTRAL:
+Background #253745
+Text #9BA8AB
+
+Badges must remain compact.
+
+============================================================
+23. VEE STATUS SYSTEM
+============================================================
+
+VEE PASSED:
+Success
+
+VEE WARNING:
+Warning
+
+VEE FAILED:
+Error
+
+VEE NOT PROCESSED:
+Info
+
+VEE PENDING:
+Neutral
+
+Recommended UI:
+- Status badge
+- Small status icon
+- Text label
+
+Do not color the entire row for ordinary VEE statuses.
+
+For critical VEE failures, use a stronger indicator but retain
+normal table readability.
+
+============================================================
+24. REVENUE PROTECTION STATUS SYSTEM
+============================================================
+
+NORMAL:
+Success
+
+SUSPECTED:
+Warning
+
+HIGH RISK:
+Error
+
+INVESTIGATION:
+Info
+
+RESOLVED:
+Success
+
+UNKNOWN:
+Neutral
+
+Risk score:
+Low = Green
+Medium = Amber
+High = Red
+
+Always include a text/icon indicator with the color.
+
+============================================================
+25. PREPAID ENGINE STATUS SYSTEM
+============================================================
+
+HEALTHY BALANCE:
+Success
+
+LOW BALANCE:
+Warning
+
+CRITICAL BALANCE:
+Error
+
+RECHARGE SUCCESS:
+Success
+
+RECHARGE PENDING:
+Warning
+
+RECHARGE FAILED:
+Error
+
+CONNECTED:
+Success
+
+DISCONNECTED:
+Error
+
+COMMUNICATION ISSUE:
+Warning
+
+The balance itself should normally remain primary text color.
+Use semantic color when a threshold has operational meaning.
+
+============================================================
+26. ENERGY DATA VISUALIZATION
+============================================================
+
+PRIMARY SERIES:
+Light: #0F766E
+Dark: #2DD4BF
+
+SECONDARY SERIES:
+Light: #0969DA
+Dark: #58A6FF
+
+TERTIARY:
+Light: #6F7D83
+Dark: #9BA8AB
+
+POSITIVE:
+Light: #16803C
+Dark: #56D364
+
+WARNING:
+Light: #9A6700
+Dark: #E3B341
+
+CRITICAL:
+Light: #CF222E
+Dark: #FF7B72
+
+LIGHT GRID:
+#E5EAED
+
+DARK GRID:
+rgba(155,168,171,0.12)
+
+Charts should normally contain no more than 4-6 visually
+distinct series.
+
+Use neutral tones wherever possible.
+
+============================================================
+27. CHART DESIGN
+============================================================
+
+Chart background:
+
+Light:
+#FFFFFF
+
+Dark:
+#253745
+
+Chart title:
+Primary text color
+
+Axis labels:
+Secondary text color
+
+Grid:
+Subtle border color
+
+Tooltip:
+
+Light:
+#11212D background
+#FFFFFF text
+
+Dark:
+#06141B background
+#CCD0CF text
+
+Important:
+Charts must remain understandable in grayscale as much as
+reasonably possible.
+
+Use:
+- Line style
+- Icons
+- Labels
+- Dashed patterns
+- Shape differences
+
+when color alone is insufficient.
+
+============================================================
+28. TABLE DESIGN PRINCIPLES
+============================================================
+
+MDMS is a data-heavy system.
+
+Tables must prioritize:
+1. Readability
+2. Scanability
+3. Alignment
+4. Status visibility
+5. Density control
+
+Recommended:
+- 13px body text
+- 12px headers
+- 40-48px row height
+- Mono font for technical identifiers
+- Right-align numeric values
+- Consistent decimal precision
+- Status badges instead of full-row coloring
+
+Avoid:
+- Excessive row separators
+- Huge typography
+- Excessive colors
+- Extremely dense rows
+- Long unbroken text
+
+============================================================
+29. NUMBER FORMATTING
+============================================================
+
+Energy:
+2,481.72 kWh
+
+Voltage:
+230.4 V
+
+Current:
+12.42 A
+
+Power:
+4.82 kW
+
+Energy cost:
+₹1,245.50
+
+Percentage:
+98.42%
+
+Large numbers:
+2.48M
+98.42%
+
+Numeric values:
+Roboto Mono where alignment is operationally important.
+
+============================================================
+30. ICONOGRAPHY
+============================================================
+
+Icon style:
+- Simple
+- Technical
+- Consistent stroke
+- Minimal decoration
+
+LIGHT MODE:
+Default icon:
+#4A5C6A
+
+Active:
+#11212D
+
+Accent:
+#0F9F91
+
+DARK MODE:
+Default:
+#9BA8AB
+
+Active:
+#CCD0CF
+
+Accent:
+#2DD4BF
+
+Sizes:
+
+16px:
+Compact controls
+
+18px:
+Standard UI
+
+20px:
+Navigation
+
+24px:
+Prominent actions
+
+32px+:
+Empty states / feature illustrations
+
+============================================================
+31. BORDERS
+============================================================
+
+LIGHT MODE:
+
+Subtle:
+#E5EAED
+
+Default:
+#D9E0E3
+
+Strong:
+#B8C3C8
+
+DARK MODE:
+
+Subtle:
+rgba(155,168,171,0.12)
+
+Default:
+rgba(155,168,171,0.18)
+
+Strong:
+rgba(204,208,207,0.28)
+
+Do not place a heavy border around every component.
+
+Prefer:
+- Surface contrast
+- Spacing
+- Subtle border
+- Small shadow where needed
+
+============================================================
+32. SHADOWS
+============================================================
+
+LIGHT MODE:
+
+Small:
+0 2px 8px rgba(6,20,27,0.06)
+
+Card:
+0 4px 16px rgba(6,20,27,0.08)
+
+Modal:
+0 20px 50px rgba(6,20,27,0.18)
+
+DARK MODE:
+
+Card:
+0 8px 24px rgba(0,0,0,0.24)
+
+Modal:
+0 20px 50px rgba(0,0,0,0.35)
+
+Do not shadow every card.
+
+============================================================
+33. BORDER RADIUS
+============================================================
+
+Small controls:
+6px
+
+Inputs:
+8px
+
+Buttons:
+8px
+
+Cards:
+12px
+
+Large panels:
+16px
+
+Modals:
+16px
+
+Pills:
+999px
+
+Keep the radius system consistent across both themes.
+
+============================================================
+34. SPACING SYSTEM
+============================================================
+
+Base:
+4px
+
+Scale:
+
+4
+8
+12
+16
+20
+24
+32
+40
+48
+64
+
+Common:
+
+Icon gap:
+8px
+
+Input padding:
+12px
+
+Card padding:
+20-24px
+
+Section gap:
+32px
+
+Page padding:
+24-32px
+
+Large dashboard gap:
+40-48px
+
+============================================================
+35. RESPONSIVE TYPOGRAPHY
+============================================================
+
+Desktop:
+
+Page title:
+32px
+
+Section:
+24px
+
+Card:
+18px
+
+Body:
+14px
+
+Mobile:
+
+Page title:
+24px
+
+Section:
+20px
+
+Card:
+16px
+
+Body:
+14px
+
+KPI:
+28-32px
+
+Do not shrink body text below 13px for normal application use.
+
+============================================================
+36. ACCESSIBILITY
+============================================================
+
+The UI must not rely solely on color.
+
+Example:
+
+BAD:
+Red = VEE failed
+
+GOOD:
+[!] VEE Failed
+
+where:
+- Red communicates severity
+- Icon communicates state
+- Text communicates exact meaning
+
+Focus states must be obvious.
+
+Light focus:
+#0969DA
+
+Dark focus:
+#58A6FF
+
+Avoid:
+- Light gray text on white
+- Dark gray text on dark navy
+- Low-contrast disabled states
+- Color-only charts
+- Color-only status
+
+============================================================
+37. DARK MODE BEHAVIOR
+============================================================
+
+Dark mode should NOT simply invert the light theme.
+
+Use a purpose-built dark hierarchy:
+
+#06141B
+    ↓
+#11212D
+    ↓
+#253745
+    ↓
+#304553
+
+The darker the surface, the lower its visual elevation.
+
+Text:
+#CCD0CF
+    ↓
+#9BA8AB
+    ↓
+#7F8D91
+
+Do not use pure black #000000 as the main application
+background.
+
+============================================================
+38. LIGHT MODE BEHAVIOR
+============================================================
+
+Light mode should remain mostly neutral.
+
+Use:
+
+#F5F7F8
+    ↓
+#FFFFFF
+    ↓
+#F1F4F5
+    ↓
+#E8EDF0
+
+Primary text:
+#11212D
+
+Secondary:
+#4A5C6A
+
+Muted:
+#6F7D83
+
+The dark sidebar creates strong brand recognition while the
+main content remains comfortable for long sessions.
+
+============================================================
+39. THEME SWITCHING
+============================================================
+
+The following elements should change between themes:
+
+- Page background
+- Header surface
+- Cards
+- Inputs
+- Tables
+- Borders
+- Text colors
+- Shadows
+- Semantic soft backgrounds
+- Focus treatment where required
+
+The following should remain conceptually consistent:
+
+- Font family
+- Font sizes
+- Font weights
+- Spacing
+- Border radius
+- Component structure
+- Semantic meaning
+- Navigation structure
+- Information hierarchy
+
+Do NOT create separate component designs for light and dark.
+Create one component system with theme tokens.
+
+============================================================
+40. CSS THEME ARCHITECTURE
+============================================================
+
+Recommended structure:
+
+:root {
+  --font-primary: "Roboto Flex", "Noto Sans", system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+
+  --font-mono: "Roboto Mono", "SFMono-Regular", Consolas,
+    monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+LIGHT THEME:
+
+[data-theme="light"] {
+  --color-bg-app: #F5F7F8;
+  --color-bg-sidebar: #06141B;
+  --color-bg-header: #FFFFFF;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-hover: #F1F4F5;
+  --color-bg-surface-active: #E8EDF0;
+
+  --color-text-primary: #11212D;
+  --color-text-secondary: #4A5C6A;
+  --color-text-muted: #6F7D83;
+  --color-text-disabled: #9BA8AB;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border-default: #D9E0E3;
+  --color-border-subtle: #E5EAED;
+  --color-border-strong: #B8C3C8;
+
+  --color-accent: #0F9F91;
+  --color-focus: #0969DA;
+
+  --color-success: #16803C;
+  --color-warning: #9A6700;
+  --color-error: #CF222E;
+  --color-info: #0969DA;
+}
+
+DARK THEME:
+
+[data-theme="dark"] {
+  --color-bg-app: #06141B;
+  --color-bg-sidebar: #06141B;
+  --color-bg-header: #11212D;
+  --color-bg-surface: #253745;
+  --color-bg-surface-hover: #304553;
+  --color-bg-surface-active: #344B5B;
+
+  --color-text-primary: #CCD0CF;
+  --color-text-secondary: #9BA8AB;
+  --color-text-muted: #7F8D91;
+  --color-text-disabled: #56666D;
+  --color-text-inverse: #06141B;
+
+  --color-border-default: rgba(155,168,171,0.18);
+  --color-border-subtle: rgba(155,168,171,0.12);
+  --color-border-strong: rgba(204,208,207,0.28);
+
+  --color-accent: #2DD4BF;
+  --color-focus: #58A6FF;
+
+  --color-success: #56D364;
+  --color-warning: #E3B341;
+  --color-error: #FF7B72;
+  --color-info: #79C0FF;
+}
+
+============================================================
+41. RECOMMENDED DEFAULT THEME
+============================================================
+
+Default:
+LIGHT MODE
+
+Reason:
+MDMS contains:
+- Large tables
+- Long data sessions
+- Meter records
+- Consumer records
+- Reports
+- VEE results
+- Load Survey data
+- Audit information
+- Revenue protection cases
+
+Light mode is recommended for general operational work.
+
+Dark mode should remain available for:
+- Control room environments
+- Low-light work
+- User preference
+- Monitoring dashboards
+- Long sessions where users prefer dark surfaces
+
+============================================================
+42. OVERALL VISUAL RATIO
+============================================================
+
+LIGHT MODE:
+
+Approximately:
+
+70-80%:
+White / cool gray surfaces
+
+10-15%:
+Navy / slate
+
+5-10%:
+Semantic colors and accent
+
+DARK MODE:
+
+Approximately:
+
+75-85%:
+Navy / slate
+
+10-15%:
+Cool gray text
+
+5-10%:
+Semantic colors and accent
+
+This keeps the UI sophisticated and prevents color overload.
+
+============================================================
+43. DO / DON'T
+============================================================
+
+DO:
+
+- Use Light Mode as the default.
+- Keep the dark navy sidebar.
+- Use Roboto Flex throughout the application.
+- Use Roboto Mono for technical data.
+- Use Noto Sans for multilingual fallback.
+- Keep semantic colors consistent.
+- Use subtle borders.
+- Use whitespace.
+- Use typography to establish hierarchy.
+- Use surface elevation instead of excessive borders.
+- Make tables highly readable.
+- Keep charts restrained.
+- Support a complete dark theme rather than simply inverting
+  colors.
+
+DON'T:
+
+- Use pure black as the default background.
+- Use pure white everywhere.
+- Use 10+ bright colors in dashboards.
+- Use color as the only status indicator.
+- Make every card colorful.
+- Make every navigation item bold.
+- Use gradients as the main UI language.
+- Use heavy shadows everywhere.
+- Use different fonts for every module.
+- Use too many font weights.
+- Make technical IDs proportional when monospaced alignment
+  is useful.
+- Create separate inconsistent component designs for each theme.
+
+============================================================
+44. FINAL DESIGN PHILOSOPHY
+============================================================
+
+LIGHT MODE:
+
+Clean.
+Professional.
+Operational.
+Readable.
+Data-first.
+
+Dark navy sidebar + white content surfaces + restrained teal,
+blue, green, amber and red status colors.
+
+DARK MODE:
+
+Technical.
+Premium.
+Focused.
+Low-light friendly.
+Data-first.
+
+Deep navy background + slate surfaces + cool gray typography +
+restrained semantic colors.
+
+THE CORE SYSTEM:
+
+Color = Meaning
+Typography = Hierarchy
+Spacing = Structure
+Surface = Elevation
+Icons = Recognition
+Status = Action
+
+The product should immediately communicate:
+
+1. Where am I?
+2. What is important?
+3. What needs attention?
+4. What is the current meter/system status?
+5. What action should I take?
+6. What information is operationally significant?
+
+The visual system must support the user rather than compete with
+the data.
+
+============================================================
+END OF DOCUMENT
+============================================================

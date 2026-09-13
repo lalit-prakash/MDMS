@@ -16,10 +16,9 @@ import {
   TableCell,
   TableBody,
   Grid,
-  Card,
-  CardContent,
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
+import { MorphingStat } from "@/components/MorphingStat";
 
 interface EnergyBalanceResult {
   hierarchyNodeId: string;
@@ -38,21 +37,6 @@ interface NetworkEnergyReading {
   hierarchyNodeId: string;
   date: string;
   energyKwh: number;
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function EnergyAuditPage() {
@@ -139,13 +123,22 @@ export default function EnergyAuditPage() {
       {balance && (
         <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Stat label="Input energy (kWh)" value={balance.inputEnergyKwh?.toString() ?? "No reading"} />
+            <MorphingStat
+              transitionName="kpi-input-energy"
+              label="Input energy (kWh)"
+              value={balance.inputEnergyKwh?.toString() ?? "No reading"}
+            />
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Stat label="Accounted energy (kWh)" value={balance.accountedEnergyKwh.toString()} />
+            <MorphingStat
+              transitionName="kpi-accounted-energy"
+              label="Accounted energy (kWh)"
+              value={balance.accountedEnergyKwh.toString()}
+            />
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Stat
+            <MorphingStat
+              transitionName="kpi-discrepancy"
               label="Discrepancy"
               value={
                 balance.discrepancyKwh === null
@@ -155,7 +148,8 @@ export default function EnergyAuditPage() {
             />
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Stat
+            <MorphingStat
+              transitionName="kpi-data-completeness"
               label="Data completeness"
               value={
                 balance.dataCompletenessPercent === null

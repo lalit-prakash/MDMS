@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { MeasurementRangeThreshold, MeasurementRangeType, VeeExecutionRecord } from "@/lib/types";
-import { QualityChip } from "@/components/QualityChip";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function VeePage() {
   const queryClient = useQueryClient();
@@ -191,7 +191,7 @@ export default function VeePage() {
                 <TableCell>{r.ruleName}</TableCell>
                 <TableCell>{new Date(r.slotStartUtc).toLocaleString()}</TableCell>
                 <TableCell>
-                  <QualityChip value={r.resultQuality} />
+                  <StatusBadge value={r.resultQuality} />
                 </TableCell>
                 <TableCell align="right">{r.newValue ?? "—"}</TableCell>
                 <TableCell>{r.details}</TableCell>

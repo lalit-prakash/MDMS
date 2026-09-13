@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { Complaint, ComplaintSource } from "@/lib/complaints";
-import { QualityChip } from "@/components/QualityChip";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const SOURCES: ComplaintSource[] = ["ConsumerPortal", "MobileApp", "Helpline1912"];
 
@@ -131,7 +131,7 @@ export default function ComplaintsPage() {
                 <TableCell>{c.description}</TableCell>
                 <TableCell>{c.source}</TableCell>
                 <TableCell>
-                  <QualityChip value={c.status} />
+                  <StatusBadge value={c.status} />
                 </TableCell>
                 <TableCell>{new Date(c.slaDueUtc).toLocaleString()}</TableCell>
                 <TableCell align="right">
