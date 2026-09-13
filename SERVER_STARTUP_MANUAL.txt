@@ -11,11 +11,32 @@ PREREQUISITES (one-time)
 -------------------------
 1. .NET 8 SDK installed.
 2. Node.js (v20+) and npm installed.
-3. PostgreSQL running locally, with a database named "mdms" and a user matching
-   backend/MDMS.Api/appsettings.json's ConnectionStrings:Mdms value (default:
-   Host=localhost;Port=5432;Database=mdms;Username=postgres;Password=CHANGE_ME
-   — replace CHANGE_ME with your actual local Postgres password, or set it via
-   user-secrets / an environment variable instead of editing the file directly).
+3. PostgreSQL running locally, with a database named "mdms".
+4. Point the backend at your real Postgres password (see below) — the
+   appsettings.json value is a placeholder and will NOT work as-is.
+
+
+SET YOUR POSTGRES PASSWORD (one-time)
+----------------------------------------
+backend/MDMS.Api/appsettings.json ships with a placeholder connection string
+(Password=CHANGE_ME) that cannot work on your machine — it must be replaced
+with YOUR actual local Postgres password. Do this once via .NET user-secrets
+(keeps it out of the file, never committed to git):
+
+    cd C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo\backend\MDMS.Api
+    dotnet user-secrets set "ConnectionStrings:Mdms" "Host=localhost;Port=5432;Database=mdms;Username=postgres;Password=REPLACE_THIS_PART_ONLY"
+
+IMPORTANT: In that command, replace ONLY the text "REPLACE_THIS_PART_ONLY"
+with your real Postgres password — type it in yourself. Do not paste this
+line verbatim: nobody else knows your password, so no example command in
+this file (or given to you by anyone else) can ever contain the real value
+for you. If you don't know your Postgres password, see "COMMON PROBLEMS"
+below for how to check/reset it.
+
+Verify it took effect:
+    dotnet user-secrets list
+    (should print ConnectionStrings:Mdms = Host=...;Password=<your real password>,
+    not CHANGE_ME or a placeholder)
 
 
 1. START THE BACKEND API
@@ -108,6 +129,33 @@ Frontend loads but every page shows "could not reach the backend API"
   -> The backend (step 1) isn't running, or isn't reachable at
      http://localhost:5004. Check its terminal for errors, and that
      Postgres itself is running.
+
+Backend crashes on startup with:
+  "Npgsql.PostgresException: 28P01: password authentication failed for
+   user 'postgres'"
+  -> Your Postgres password hasn't been set correctly. See "SET YOUR
+     POSTGRES PASSWORD" above. If you don't know your password:
+       - Try the password you chose when installing PostgreSQL, or the
+         one in pgAdmin's saved connection (pgAdmin -> right-click your
+         server -> Properties -> Connection, though it won't show the
+         password itself, just confirm the server/user).
+       - To reset it outright, open pgAdmin (or psql as an OS admin) and run:
+             ALTER USER postgres WITH PASSWORD 'a-new-password-you-choose';
+         then use that new password in the user-secrets command above.
+
+"npm : File ...\npm.ps1 cannot be loaded because running scripts is
+disabled on this system" (PowerShell only)
+  -> One-time PowerShell setting, unrelated to this project:
+         Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+     Answer "Y" when prompted, then re-run npm install/npm run dev normally.
+     (Or use `npm.cmd install` / `npm.cmd run dev` to sidestep it entirely.)
+
+"MSB3021/MSB3027: Could not copy ... The file is locked by another process"
+  -> A previous `dotnet run` (backend) is still running somewhere and
+     holding its own build output locked. Find and stop it first:
+         Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
+     (This stops ALL dotnet processes, backend included — safe to do
+     before re-running `dotnet build` or `dotnet run`.)
 
 Login says "No MDMS user account found with that username"
   -> That username doesn't exist in the Users module yet. See step 3.
