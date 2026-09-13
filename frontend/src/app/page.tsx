@@ -10,6 +10,7 @@ import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import { apiClient } from "@/lib/apiClient";
 import { Meter, LoadSurveyInterval, DailyLoadProfile, VeeExecutionRecord, MeasurementQuality } from "@/lib/types";
+import { ReportResult } from "@/lib/reports/types";
 import { Complaint } from "@/lib/complaints";
 import { RevenueProtectionLead } from "@/lib/revenueProtection";
 import { KpiCard } from "@/components/KpiCard";
@@ -61,8 +62,16 @@ export default function HomePage() {
     queryKey: ["dashboard-data-quality-holds"],
     queryFn: () => apiClient.get<unknown[]>("/api/v1/meter-data/billing-holds?activeOnly=true"),
   });
-  const lsQuery = useQuery({ queryKey: ["dashboard-ls"], queryFn: () => apiClient.get<LoadSurveyInterval[]>("/api/v1/meter-data/ls") });
-  const dlpQuery = useQuery({ queryKey: ["dashboard-dlp"], queryFn: () => apiClient.get<DailyLoadProfile[]>("/api/v1/meter-data/dlp") });
+  // These endpoints paginate now (max 100 rows/page) — the dashboard's quality-mix donut reads
+  // that one page as a real, if capped, sample rather than every LS/DLP row in the system.
+  const lsQuery = useQuery({
+    queryKey: ["dashboard-ls"],
+    queryFn: () => apiClient.get<ReportResult<LoadSurveyInterval, undefined>>("/api/v1/meter-data/ls?pageSize=100"),
+  });
+  const dlpQuery = useQuery({
+    queryKey: ["dashboard-dlp"],
+    queryFn: () => apiClient.get<ReportResult<DailyLoadProfile, undefined>>("/api/v1/meter-data/dlp?pageSize=100"),
+  });
   const veeQuery = useQuery({
     queryKey: ["dashboard-vee-executions"],
     queryFn: () => apiClient.get<VeeExecutionRecord[]>("/api/v1/vee/execution-records"),
@@ -80,8 +89,8 @@ export default function HomePage() {
   const veePassRate = veeTotal > 0 ? Math.round((veePassed / veeTotal) * 1000) / 10 : null;
 
   const qualityCounts = countBy<MeasurementQuality>([
-    ...(lsQuery.data?.map((r) => r.quality) ?? []),
-    ...(dlpQuery.data?.map((r) => r.quality) ?? []),
+    ...(lsQuery.data?.data.map((r) => r.quality) ?? []),
+    ...(dlpQuery.data?.data.map((r) => r.quality) ?? []),
   ]);
   const qualityTotal = Object.values(qualityCounts).reduce((a, b) => a + (b ?? 0), 0);
   const qualitySegments = (Object.keys(qualityCounts) as MeasurementQuality[])

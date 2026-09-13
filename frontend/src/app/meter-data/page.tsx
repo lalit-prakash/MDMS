@@ -203,6 +203,7 @@ export default function MeterDataPage() {
 
       {tab === "ls" && (
         <MeterDataListTab<LoadSurveyInterval>
+          title="Load Survey (LS)"
           endpoint="/api/v1/meter-data/ls"
           filenamePrefix="MDMS_LoadSurvey"
           columns={lsColumns}
@@ -212,6 +213,7 @@ export default function MeterDataPage() {
 
       {tab === "dlp" && (
         <MeterDataListTab<DailyLoadProfile>
+          title="Daily Profile (DP)"
           endpoint="/api/v1/meter-data/dlp"
           filenamePrefix="MDMS_DailyProfile"
           columns={dlpColumns}
@@ -222,6 +224,7 @@ export default function MeterDataPage() {
 
       {tab === "ip" && (
         <MeterDataListTab<InstantaneousProfile>
+          title="Instantaneous Profile (IP)"
           endpoint="/api/v1/meter-data/ip"
           filenamePrefix="MDMS_InstantaneousProfile"
           columns={ipColumns}
@@ -231,6 +234,7 @@ export default function MeterDataPage() {
 
       {tab === "bp" && (
         <MeterDataListTab<BillingProfile>
+          title="Billing Profile (BP)"
           endpoint="/api/v1/meter-data/bp"
           filenamePrefix="MDMS_BillingProfile"
           columns={bpColumns}
@@ -241,6 +245,7 @@ export default function MeterDataPage() {
 
       {tab === "events" && (
         <MeterDataListTab<MeterEvent>
+          title="Events"
           endpoint="/api/v1/meter-data/events"
           filenamePrefix="MDMS_Events"
           columns={eventColumns(acknowledgeEvents)}
@@ -250,6 +255,7 @@ export default function MeterDataPage() {
 
       {tab === "alarms" && (
         <MeterDataListTab<MeterEvent>
+          title="Alarm Details"
           endpoint="/api/v1/meter-data/alarms"
           filenamePrefix="MDMS_Alarms"
           columns={eventColumns(acknowledgeAlarms)}

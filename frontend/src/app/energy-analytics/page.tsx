@@ -5,6 +5,7 @@ import { Alert, Box, Card, CardContent, Grid, Typography } from "@mui/material";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import { apiClient } from "@/lib/apiClient";
 import { DailyLoadProfile } from "@/lib/types";
+import { ReportResult } from "@/lib/reports/types";
 import { PageHeader } from "@/components/PageHeader";
 import { TrendLineChart } from "@/components/TrendLineChart";
 
@@ -12,15 +13,17 @@ import { TrendLineChart } from "@/components/TrendLineChart";
  * Consumption analytics from Daily Load Profile data — the only interval-level consumption
  * numbers this system actually records. The reporting spec's Demand/Peak Demand/Load Factor
  * metrics need a kW demand field no entity here has (DailyLoadProfile only has consumptionKwh),
- * so those are left out rather than approximated from a field that doesn't exist.
+ * so those are left out rather than approximated from a field that doesn't exist. The endpoint
+ * paginates (max 100 rows/page) — this reads one page as a real, if capped, recent sample rather
+ * than every DLP row in the system.
  */
 export default function EnergyAnalyticsPage() {
   const dlpQuery = useQuery({
     queryKey: ["energy-analytics-dlp"],
-    queryFn: () => apiClient.get<DailyLoadProfile[]>("/api/v1/meter-data/dlp"),
+    queryFn: () => apiClient.get<ReportResult<DailyLoadProfile, undefined>>("/api/v1/meter-data/dlp?pageSize=100"),
   });
 
-  const validRows = (dlpQuery.data ?? []).filter((r) => r.quality === "Valid");
+  const validRows = (dlpQuery.data?.data ?? []).filter((r) => r.quality === "Valid");
   const byDate = new Map<string, number>();
   for (const r of validRows) {
     byDate.set(r.profileDate, (byDate.get(r.profileDate) ?? 0) + r.consumptionKwh);

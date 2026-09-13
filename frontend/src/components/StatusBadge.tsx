@@ -61,6 +61,15 @@ const STATUS_CATEGORY: Record<string, SemanticCategory> = {
   // Prepaid connection
   Connected: "success",
   Disconnected: "error",
+  // MeterEventSeverity
+  Info: "info",
+  Warning: "warning",
+  Critical: "error",
+  // MeterEvent acknowledgement status (Open already covered above via ComplaintStatus)
+  Acknowledged: "success",
+  // LoadLimitState
+  Normal: "success",
+  Limited: "warning",
 };
 
 export function getSemanticCategory(value: string): SemanticCategory {

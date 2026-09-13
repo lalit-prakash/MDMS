@@ -10,6 +10,7 @@ import {
   TableRow,
   Typography,
   IconButton,
+  Button,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -22,8 +23,21 @@ export interface ReportColumn<TRow> {
   render: (row: TRow) => React.ReactNode;
 }
 
-/** The shared table + pagination shell every report screen uses — max 100 rows/page, server-side
- * pagination, explicit empty/loading/error states, per the reporting spec. */
+/** first, last, current±1, with "…" gaps — the standard numbered-pagination window. */
+function pageWindow(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const result: (number | "…")[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("…");
+    result.push(sorted[i]);
+  }
+  return result;
+}
+
+/** The shared table + pagination shell every report / meter-data screen uses — max 100 rows/page,
+ * server-side pagination, explicit empty/loading/error states, numbered page controls. */
 export function ReportTable<TRow>({
   columns,
   rows,
@@ -110,13 +124,13 @@ export function ReportTable<TRow>({
             py: 1.5,
             borderTop: "1px solid var(--color-border-default)",
             flexWrap: "wrap",
-            gap: 1,
+            gap: 1.5,
           }}
         >
-          <Typography variant="caption" color="text.secondary">
-            Showing {from}-{to} of {pagination.totalRecords.toLocaleString()}
-          </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Show
+            </Typography>
             <Select
               size="small"
               value={pagination.pageSize}
@@ -125,20 +139,44 @@ export function ReportTable<TRow>({
             >
               {REPORT_PAGE_SIZES.map((size) => (
                 <MenuItem key={size} value={size} sx={{ fontSize: 13 }}>
-                  {size} rows
+                  {size}
                 </MenuItem>
               ))}
             </Select>
+            <Typography variant="caption" color="text.secondary">
+              entries
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <IconButton size="small" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>
               <ChevronLeftIcon fontSize="small" />
             </IconButton>
-            <Typography variant="caption">
-              Page {pagination.page} of {pagination.totalPages}
-            </Typography>
+            {pageWindow(pagination.page, pagination.totalPages).map((p, i) =>
+              p === "…" ? (
+                <Typography key={`gap-${i}`} variant="caption" sx={{ px: 0.5, color: "var(--card-muted)" }}>
+                  …
+                </Typography>
+              ) : (
+                <Button
+                  key={p}
+                  size="small"
+                  variant={p === pagination.page ? "contained" : "text"}
+                  onClick={() => onPageChange(p)}
+                  sx={{ minWidth: 30, px: 0, fontSize: 12 }}
+                >
+                  {p}
+                </Button>
+              )
+            )}
             <IconButton size="small" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>
               <ChevronRightIcon fontSize="small" />
             </IconButton>
           </Box>
+
+          <Typography variant="caption" color="text.secondary">
+            Showing {from} to {to} of {pagination.totalRecords.toLocaleString()} records
+          </Typography>
         </Box>
       )}
     </Paper>

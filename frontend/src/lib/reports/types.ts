@@ -13,4 +13,4 @@ export interface ReportResult<TRow, TSummary> {
 }
 
 /** Page sizes the reporting spec allows — never 500/1000/"All". */
-export const REPORT_PAGE_SIZES = [25, 50, 100] as const;
+export const REPORT_PAGE_SIZES = [10, 25, 50, 100] as const;
