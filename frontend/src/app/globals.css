@@ -1,17 +1,258 @@
+/*
+ * MDMS design tokens — CSS Theme Architecture per MDMS_Complete_Color_Typography_Light_Dark.txt
+ * §40. Values are copied verbatim from the spec; do not hand-tune a hex value here without
+ * updating the spec doc (or vice versa) — this file and the doc must never drift apart.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* next/font supplies the actual loaded font via these --font-roboto-* variables (set on <html>
+     in layout.tsx) — reference them rather than the bare family name so next/font's own
+     font-display/preload optimization actually applies. */
+  --font-primary: var(--font-roboto-flex), var(--font-noto-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-roboto-mono), "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Sidebar keeps the same dark identity in both themes (§21) */
+  --color-bg-sidebar: #06141B;
+  --color-sidebar-text: #CCD0CF;
+  --color-sidebar-text-secondary: #9BA8AB;
+  --color-sidebar-hover: #11212D;
+  --color-sidebar-active: #253745;
+  --color-sidebar-active-text: #FFFFFF;
+  --color-sidebar-active-indicator: #2DD4BF;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+[data-theme="light"] {
+  --color-bg-app: #F5F7F8;
+  --color-bg-header: #FFFFFF;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-hover: #F1F4F5;
+  --color-bg-surface-active: #E8EDF0;
+  --color-bg-input: #FFFFFF;
+
+  --color-text-primary: #11212D;
+  --color-text-secondary: #4A5C6A;
+  --color-text-muted: #6F7D83;
+  --color-text-disabled: #9BA8AB;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border-default: #D9E0E3;
+  --color-border-subtle: #E5EAED;
+  --color-border-strong: #B8C3C8;
+
+  --color-brand-primary: #06141B;
+  --color-brand-secondary: #11212D;
+  --color-accent: #0F9F91;
+  --color-accent-soft: #E4F7F4;
+  --color-focus: #0969DA;
+  --color-focus-ring: rgba(9, 105, 218, 0.18);
+
+  --color-success: #16803C;
+  --color-warning: #9A6700;
+  --color-error: #CF222E;
+  --color-info: #0969DA;
+
+  --header-text: #11212D;
+  --header-text-secondary: #4A5C6A;
+  --header-icon: #4A5C6A;
+  --header-icon-hover: #06141B;
+  --header-border: #D9E0E3;
+
+  --card-hover: #F1F4F5;
+  --card-title: #11212D;
+  --card-body: #4A5C6A;
+  --card-muted: #6F7D83;
+  --card-metric: #06141B;
+
+  --btn-primary-bg: #06141B;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #11212D;
+  --btn-primary-active: #253745;
+  --btn-secondary-bg: #FFFFFF;
+  --btn-secondary-text: #11212D;
+  --btn-secondary-border: #B8C3C8;
+  --btn-secondary-hover: #F1F4F5;
+  --btn-ghost-text: #4A5C6A;
+  --btn-ghost-hover: #F1F4F5;
+  --btn-ghost-hover-text: #11212D;
+  --btn-danger-bg: #D73A49;
+  --btn-danger-text: #FFFFFF;
+  --btn-danger-hover: #CF222E;
+
+  --input-bg: #FFFFFF;
+  --input-border: #B8C3C8;
+  --input-text: #11212D;
+  --input-placeholder: #6F7D83;
+  --input-disabled: #F1F4F5;
+
+  --table-container: #FFFFFF;
+  --table-header: #F5F7F8;
+  --table-header-text: #4A5C6A;
+  --table-body: #11212D;
+  --table-secondary: #4A5C6A;
+  --table-divider: #E5EAED;
+  --table-hover: #F1F4F5;
+  --table-selected: #EAF3FF;
+
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(6, 20, 27, 0.45);
+  --modal-title: #11212D;
+  --modal-body: #4A5C6A;
+  --modal-border: #D9E0E3;
+
+  --badge-success-bg: #EAF7EE;
+  --badge-success-text: #16803C;
+  --badge-warning-bg: #FFF6DD;
+  --badge-warning-text: #9A6700;
+  --badge-error-bg: #FDECEC;
+  --badge-error-text: #CF222E;
+  --badge-info-bg: #EAF3FF;
+  --badge-info-text: #0969DA;
+  --badge-neutral-bg: #F1F4F5;
+  --badge-neutral-text: #4A5C6A;
+
+  --chart-bg: #FFFFFF;
+  --chart-grid: #E5EAED;
+  --chart-tooltip-bg: #11212D;
+  --chart-tooltip-text: #FFFFFF;
+  --chart-primary: #0F766E;
+  --chart-secondary: #0969DA;
+  --chart-tertiary: #6F7D83;
+
+  --icon-default: #4A5C6A;
+  --icon-active: #11212D;
+  --icon-accent: #0F9F91;
+
+  --shadow-sm: 0 2px 8px rgba(6, 20, 27, 0.06);
+  --shadow-card: 0 4px 16px rgba(6, 20, 27, 0.08);
+  --shadow-modal: 0 20px 50px rgba(6, 20, 27, 0.18);
+}
+
+[data-theme="dark"] {
+  --color-bg-app: #06141B;
+  --color-bg-header: #11212D;
+  --color-bg-surface: #253745;
+  --color-bg-surface-hover: #304553;
+  --color-bg-surface-active: #344B5B;
+  --color-bg-input: #11212D;
+
+  --color-text-primary: #CCD0CF;
+  --color-text-secondary: #9BA8AB;
+  --color-text-muted: #7F8D91;
+  --color-text-disabled: #56666D;
+  --color-text-inverse: #06141B;
+
+  --color-border-default: rgba(155, 168, 171, 0.18);
+  --color-border-subtle: rgba(155, 168, 171, 0.12);
+  --color-border-strong: rgba(204, 208, 207, 0.28);
+
+  --color-brand-primary: #CCD0CF;
+  --color-brand-secondary: #9BA8AB;
+  --color-accent: #2DD4BF;
+  --color-accent-soft: #123B3A;
+  --color-focus: #58A6FF;
+  --color-focus-ring: rgba(88, 166, 255, 0.25);
+
+  --color-success: #56D364;
+  --color-warning: #E3B341;
+  --color-error: #FF7B72;
+  --color-info: #79C0FF;
+
+  --header-text: #CCD0CF;
+  --header-text-secondary: #9BA8AB;
+  --header-icon: #9BA8AB;
+  --header-icon-hover: #CCD0CF;
+  --header-border: rgba(155, 168, 171, 0.18);
+
+  --card-hover: #304553;
+  --card-title: #CCD0CF;
+  --card-body: #9BA8AB;
+  --card-muted: #7F8D91;
+  --card-metric: #CCD0CF;
+
+  --btn-primary-bg: #CCD0CF;
+  --btn-primary-text: #06141B;
+  --btn-primary-hover: #FFFFFF;
+  --btn-primary-active: #B9C0BF;
+  --btn-secondary-bg: #253745;
+  --btn-secondary-text: #CCD0CF;
+  --btn-secondary-border: #4A5C6A;
+  --btn-secondary-hover: #304553;
+  --btn-ghost-text: #9BA8AB;
+  --btn-ghost-hover: #253745;
+  --btn-ghost-hover-text: #CCD0CF;
+  --btn-danger-bg: #F85149;
+  --btn-danger-text: #06141B;
+  --btn-danger-hover: #FF7B72;
+
+  --input-bg: #11212D;
+  --input-border: #4A5C6A;
+  --input-text: #CCD0CF;
+  --input-placeholder: #9BA8AB;
+  --input-disabled: #253745;
+
+  --table-container: #253745;
+  --table-header: #11212D;
+  --table-header-text: #9BA8AB;
+  --table-body: #CCD0CF;
+  --table-secondary: #9BA8AB;
+  --table-divider: rgba(155, 168, 171, 0.14);
+  --table-hover: #304553;
+  --table-selected: #132D46;
+
+  --modal-bg: #253745;
+  --modal-overlay: rgba(0, 0, 0, 0.55);
+  --modal-title: #CCD0CF;
+  --modal-body: #9BA8AB;
+  --modal-border: rgba(155, 168, 171, 0.18);
+
+  --badge-success-bg: #183A2A;
+  --badge-success-text: #56D364;
+  --badge-warning-bg: #3A2E12;
+  --badge-warning-text: #E3B341;
+  --badge-error-bg: #42181A;
+  --badge-error-text: #FF7B72;
+  --badge-info-bg: #132D46;
+  --badge-info-text: #79C0FF;
+  --badge-neutral-bg: #253745;
+  --badge-neutral-text: #9BA8AB;
+
+  --chart-bg: #253745;
+  --chart-grid: rgba(155, 168, 171, 0.12);
+  --chart-tooltip-bg: #06141B;
+  --chart-tooltip-text: #CCD0CF;
+  --chart-primary: #2DD4BF;
+  --chart-secondary: #58A6FF;
+  --chart-tertiary: #9BA8AB;
+
+  --icon-default: #9BA8AB;
+  --icon-active: #CCD0CF;
+  --icon-accent: #2DD4BF;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.35);
 }
 
 html {
   height: 100%;
+  color-scheme: light dark;
 }
 
 html,
@@ -24,17 +265,17 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-text-primary);
+  background: var(--color-bg-app);
+  font-family: var(--font-primary);
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
 a {
@@ -42,8 +283,36 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+/* Respect prefers-reduced-motion for the theme cross-fade itself */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Native View Transitions (Chromium) ---
+   Kept short and restrained (150-250ms) per the design brief: this is an operational tool for
+   long sessions, not a marketing site. No transition is defined for browsers that don't support
+   the API — document.startViewTransition simply doesn't exist there, so navigation is instant
+   with zero visual difference, which is the required fallback behavior. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+}
+
+::view-transition-old(sidebar-active-indicator),
+::view-transition-new(sidebar-active-indicator) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

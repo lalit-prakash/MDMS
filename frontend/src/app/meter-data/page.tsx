@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import { apiClient } from "@/lib/apiClient";
 import { LoadSurveyInterval, DailyLoadProfile, DataQualityHold } from "@/lib/types";
-import { QualityChip } from "@/components/QualityChip";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function MeterDataPage() {
   const queryClient = useQueryClient();
@@ -106,10 +106,10 @@ export default function MeterDataPage() {
                 <TableCell align="right">{i.cumulativeReading}</TableCell>
                 <TableCell align="right">{i.consumptionKwh}</TableCell>
                 <TableCell>
-                  <QualityChip value={i.quality} />
+                  <StatusBadge value={i.quality} />
                 </TableCell>
                 <TableCell>
-                  <QualityChip value={i.source} />
+                  <StatusBadge value={i.source} />
                 </TableCell>
               </TableRow>
             ))}
@@ -141,10 +141,10 @@ export default function MeterDataPage() {
                 <TableCell>{p.profileDate}</TableCell>
                 <TableCell align="right">{p.consumptionKwh}</TableCell>
                 <TableCell>
-                  <QualityChip value={p.quality} />
+                  <StatusBadge value={p.quality} />
                 </TableCell>
                 <TableCell>
-                  <QualityChip value={p.source} />
+                  <StatusBadge value={p.source} />
                 </TableCell>
               </TableRow>
             ))}
@@ -182,7 +182,7 @@ export default function MeterDataPage() {
                 <TableCell>{h.reason}</TableCell>
                 <TableCell>{new Date(h.raisedAtUtc).toLocaleString()}</TableCell>
                 <TableCell>
-                  <QualityChip value={h.isActive ? "Suspect" : "Valid"} />
+                  <StatusBadge value={h.isActive ? "Active" : "Cleared"} />
                 </TableCell>
                 <TableCell align="right">
                   {h.isActive && (

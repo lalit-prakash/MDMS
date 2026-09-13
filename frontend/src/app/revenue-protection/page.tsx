@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { RevenueProtectionLead, RiskSignalType } from "@/lib/revenueProtection";
-import { QualityChip } from "@/components/QualityChip";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const SIGNAL_TYPES: RiskSignalType[] = [
   "TamperEvent",
@@ -136,7 +136,7 @@ export default function RevenueProtectionPage() {
                 <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{lead.customerId}</TableCell>
                 <TableCell align="right">{lead.riskScore}</TableCell>
                 <TableCell>
-                  <QualityChip value={lead.status} />
+                  <StatusBadge value={lead.status} />
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>

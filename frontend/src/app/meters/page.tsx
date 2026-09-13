@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { Meter, MeterPhase } from "@/lib/types";
-import { QualityChip } from "@/components/QualityChip";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function MetersPage() {
   const queryClient = useQueryClient();
@@ -123,7 +123,7 @@ export default function MetersPage() {
                 <TableCell>{meter.serialNumber}</TableCell>
                 <TableCell>{meter.phase}</TableCell>
                 <TableCell>
-                  <QualityChip value={meter.status} />
+                  <StatusBadge value={meter.status} />
                 </TableCell>
                 <TableCell>{new Date(meter.createdAtUtc).toLocaleString()}</TableCell>
               </TableRow>

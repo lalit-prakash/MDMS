@@ -21,22 +21,8 @@ import {
 } from "@mui/material";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { PrepaidAccount, WalletTransaction } from "@/lib/prepaid";
-import { QualityChip } from "@/components/QualityChip";
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-}
+import { StatusBadge } from "@/components/StatusBadge";
+import { MorphingStat } from "@/components/MorphingStat";
 
 export default function PrepaidPage() {
   const queryClient = useQueryClient();
@@ -135,7 +121,7 @@ export default function PrepaidPage() {
       {customerId && accountQuery.data && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Stat label="Balance" value={`₹${accountQuery.data.balance}`} />
+            <MorphingStat transitionName="kpi-prepaid-balance" label="Balance" value={`₹${accountQuery.data.balance}`} />
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
             <Card variant="outlined">
@@ -144,7 +130,7 @@ export default function PrepaidPage() {
                   Connection
                 </Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  <QualityChip value={accountQuery.data.isConnected ? "Valid" : "NegativeConsumption"} />
+                  <StatusBadge value={accountQuery.data.isConnected ? "Connected" : "Disconnected"} />
                 </Box>
               </CardContent>
             </Card>
