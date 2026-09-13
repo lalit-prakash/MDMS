@@ -6,6 +6,7 @@ import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { useMemo, useState } from "react";
 import { ThemeModeProvider, useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { buildMuiTheme } from "@/lib/theme/muiTheme";
+import { AuthProvider } from "@/lib/session/AuthContext";
 
 function MuiThemeBridge({ children }: { children: React.ReactNode }) {
   // Bridges our own ThemeModeContext (which owns the persisted light/dark choice and the
@@ -38,7 +39,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <AppRouterCacheProvider options={{ key: "mui" }}>
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
-          <MuiThemeBridge>{children}</MuiThemeBridge>
+          <MuiThemeBridge>
+            <AuthProvider>{children}</AuthProvider>
+          </MuiThemeBridge>
         </ThemeModeProvider>
       </QueryClientProvider>
     </AppRouterCacheProvider>

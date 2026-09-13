@@ -6,11 +6,9 @@ namespace MDMS.Domain.Entities;
 /// <summary>
 /// A named user of this MDMS with a fixed <see cref="Role"/> and, for most roles, a scoping
 /// <see cref="OrgUnitId"/> (field roles are constrained by organizational geography, not only by
-/// role — an "Admin" is the one role meaningfully unscoped). This is identity/authorization
-/// *data* only: there is no login, password, token, or permission-enforcement mechanism yet — a
-/// real `iam` module needs an auth-package decision before that can be built. Storing the model
-/// now lets every other module (assignments, QC approvals, tickets) reference a real user record
-/// rather than a free-text name.
+/// role — an "Admin" is the one role meaningfully unscoped). <see cref="PasswordHash"/> is null
+/// until the user claims their account (see AuthController's claim endpoint) — until then the
+/// account exists as a record (creatable by an Admin) but cannot sign in.
 /// </summary>
 public class User : Entity
 {
@@ -20,6 +18,12 @@ public class User : Entity
 
     /// <summary>The org unit this user's access/work is scoped to. Null only makes sense for an unscoped role like Admin.</summary>
     public Guid? OrgUnitId { get; private set; }
+
+    /// <summary>
+    /// PBKDF2 password hash (see MDMS.Application.Security.PasswordHasher) — never the plaintext
+    /// password. Null means the account has not been claimed yet and cannot sign in.
+    /// </summary>
+    public string? PasswordHash { get; private set; }
 
     private User() { }
 
@@ -51,5 +55,13 @@ public class User : Entity
 
         Role = role;
         OrgUnitId = orgUnitId;
+    }
+
+    /// <summary>Sets the password hash. Callers are responsible for hashing — this never sees plaintext.</summary>
+    public void SetPasswordHash(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Password hash is required.", nameof(passwordHash));
+        PasswordHash = passwordHash;
     }
 }

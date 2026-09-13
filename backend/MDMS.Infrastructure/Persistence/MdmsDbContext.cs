@@ -22,6 +22,7 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<HierarchyNode> HierarchyNodes => Set<HierarchyNode>();
     public DbSet<OrgUnit> OrgUnits => Set<OrgUnit>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VeeExecutionRecord> VeeExecutionRecords => Set<VeeExecutionRecord>();
     public DbSet<NetworkEnergyReading> NetworkEnergyReadings => Set<NetworkEnergyReading>();
     public DbSet<Complaint> Complaints => Set<Complaint>();
