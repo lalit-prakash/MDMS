@@ -21,6 +21,8 @@ import {
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { TariffCategory, HierarchyNode, HierarchyNodeType, OrgUnit, OrgUnitType } from "@/lib/types";
 
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import { PageHeader } from "@/components/PageHeader";
 function ErrorAlert({ error, onClose }: { error: string | null; onClose: () => void }) {
   if (!error) return null;
   return (
@@ -228,9 +230,7 @@ function OrgUnitsSection() {
 export default function ConfigPage() {
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Config
-      </Typography>
+      <PageHeader icon={<TuneOutlinedIcon fontSize="small" />} title="Config" />
       <Grid container spacing={4}>
         <Grid size={12}>
           <TariffCategoriesSection />

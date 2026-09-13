@@ -21,6 +21,8 @@ import { apiClient, ApiError } from "@/lib/apiClient";
 import { RevenueProtectionLead, RiskSignalType } from "@/lib/revenueProtection";
 import { StatusBadge } from "@/components/StatusBadge";
 
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import { PageHeader } from "@/components/PageHeader";
 const SIGNAL_TYPES: RiskSignalType[] = [
   "TamperEvent",
   "RepeatedCoverOpen",
@@ -75,9 +77,7 @@ export default function RevenueProtectionPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Revenue Protection
-      </Typography>
+      <PageHeader icon={<ShieldOutlinedIcon fontSize="small" />} title="Revenue Protection" />
       <Alert severity="info" sx={{ mb: 3 }}>
         Leads are investigation signals, never a legal conclusion. Signal weights are supplied by
         you here — this project has no built-in opinion on what a signal type is worth.

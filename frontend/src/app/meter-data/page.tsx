@@ -22,6 +22,8 @@ import { apiClient } from "@/lib/apiClient";
 import { LoadSurveyInterval, DailyLoadProfile, DataQualityHold } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import { PageHeader } from "@/components/PageHeader";
 export default function MeterDataPage() {
   const queryClient = useQueryClient();
   const [meterId, setMeterId] = useState("");
@@ -59,9 +61,7 @@ export default function MeterDataPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Meter Data
-      </Typography>
+      <PageHeader icon={<StorageOutlinedIcon fontSize="small" />} title="Meter Data" />
 
       <TextField
         label="Filter by Meter ID (optional)"

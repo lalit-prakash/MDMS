@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
-  Typography,
   Paper,
   Table,
   TableHead,
@@ -20,6 +19,8 @@ import {
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { MdmsUser, UserRole } from "@/lib/types";
 
+import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
+import { PageHeader } from "@/components/PageHeader";
 const ROLES: UserRole[] = [
   "Admin",
   "ItManager",
@@ -69,9 +70,7 @@ export default function UsersPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Users
-      </Typography>
+      <PageHeader icon={<GroupOutlinedIcon fontSize="small" />} title="Users" />
       <Alert severity="info" sx={{ mb: 3 }}>
         Identity data only — there is no login, credential, or permission-enforcement mechanism
         yet. This screen manages role/org-unit records, not authentication.

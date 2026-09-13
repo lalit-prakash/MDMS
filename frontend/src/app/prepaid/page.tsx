@@ -24,6 +24,8 @@ import { PrepaidAccount, WalletTransaction } from "@/lib/prepaid";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MorphingStat } from "@/components/MorphingStat";
 
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import { PageHeader } from "@/components/PageHeader";
 export default function PrepaidPage() {
   const queryClient = useQueryClient();
   const [customerId, setCustomerId] = useState("");
@@ -95,9 +97,7 @@ export default function PrepaidPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Prepaid
-      </Typography>
+      <PageHeader icon={<AccountBalanceWalletOutlinedIcon fontSize="small" />} title="Prepaid" />
       <Alert severity="info" sx={{ mb: 3 }}>
         No HES/meter command integration exists — reconnect only flips this account&rsquo;s own status,
         it never confirms a physical meter action. Daily billing uses a flat caller-supplied rate,
