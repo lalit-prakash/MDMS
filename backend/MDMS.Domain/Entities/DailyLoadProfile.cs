@@ -14,20 +14,36 @@ public class DailyLoadProfile : Entity
     public Guid MeterId { get; private set; }
     public DateOnly ProfileDate { get; private set; }
 
+    /// <summary>kWh Import — the field this type has always tracked, kept under its original name for compatibility.</summary>
     public decimal ConsumptionKwh { get; private set; }
+
+    /// <summary>
+    /// kVAh Import, kWh Export, kVAh Export — the remaining Daily Profile (DP) parameters per the
+    /// meter-data spec, beyond the single kWh Import figure this type originally tracked. Null on
+    /// rows ingested before these were added, and on provisional/estimated profiles (the
+    /// estimation service only ever estimates the primary consumption figure).
+    /// </summary>
+    public decimal? KvahImport { get; private set; }
+    public decimal? KwhExport { get; private set; }
+    public decimal? KvahExport { get; private set; }
+
     public MeasurementSource Source { get; private set; }
     public MeasurementQuality Quality { get; private set; }
 
     private DailyLoadProfile() { }
 
     public static DailyLoadProfile CreateReceived(
-        Guid servicePointId, Guid meterId, DateOnly profileDate, decimal consumptionKwh)
+        Guid servicePointId, Guid meterId, DateOnly profileDate, decimal consumptionKwh,
+        decimal? kvahImport = null, decimal? kwhExport = null, decimal? kvahExport = null)
         => new()
         {
             ServicePointId = servicePointId,
             MeterId = meterId,
             ProfileDate = profileDate,
             ConsumptionKwh = consumptionKwh,
+            KvahImport = kvahImport,
+            KwhExport = kwhExport,
+            KvahExport = kvahExport,
             Source = MeasurementSource.Received,
             Quality = MeasurementQuality.Valid
         };

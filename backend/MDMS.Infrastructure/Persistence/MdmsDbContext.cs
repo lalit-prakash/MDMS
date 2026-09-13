@@ -15,6 +15,9 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<MeterAssignment> MeterAssignments => Set<MeterAssignment>();
     public DbSet<LoadSurveyInterval> LoadSurveyIntervals => Set<LoadSurveyInterval>();
     public DbSet<DailyLoadProfile> DailyLoadProfiles => Set<DailyLoadProfile>();
+    public DbSet<InstantaneousProfile> InstantaneousProfiles => Set<InstantaneousProfile>();
+    public DbSet<BillingProfile> BillingProfiles => Set<BillingProfile>();
+    public DbSet<MeterEvent> MeterEvents => Set<MeterEvent>();
     public DbSet<DataQualityHold> DataQualityHolds => Set<DataQualityHold>();
     public DbSet<VeeRuleDefinition> VeeRuleDefinitions => Set<VeeRuleDefinition>();
     public DbSet<MeasurementRangeThreshold> MeasurementRangeThresholds => Set<MeasurementRangeThreshold>();

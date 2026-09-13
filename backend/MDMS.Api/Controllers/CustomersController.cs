@@ -77,7 +77,7 @@ public class CustomersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = customer.Id }, new CustomerResponse(customer.Id, customer.AccountNumber, customer.Name, []));
     }
 
-    public record AddServicePointRequest(string Address);
+    public record AddServicePointRequest(string Address, Guid? DistributionTransformerNodeId);
 
     [HttpPost("{id:guid}/service-points")]
     public async Task<IActionResult> AddServicePoint(Guid id, [FromBody] AddServicePointRequest request, CancellationToken ct)
@@ -95,8 +95,44 @@ public class CustomersController : ControllerBase
             return BadRequest(ex.Message);
         }
 
+        if (request.DistributionTransformerNodeId is Guid dtId)
+        {
+            var dtNode = await _db.HierarchyNodes.FirstOrDefaultAsync(n => n.Id == dtId, ct);
+            if (dtNode is null) return NotFound($"Distribution transformer node {dtId} not found.");
+            try
+            {
+                servicePoint.AssignDistributionTransformer(dtNode);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         _db.ServicePoints.Add(servicePoint);
         await _db.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(GetById), new { id }, new ServicePointSummary(servicePoint.Id, servicePoint.Address, servicePoint.DistributionTransformerNodeId));
+    }
+
+    [HttpPost("{id:guid}/service-points/{servicePointId:guid}/assign-dt/{dtNodeId:guid}")]
+    public async Task<IActionResult> AssignDistributionTransformer(Guid id, Guid servicePointId, Guid dtNodeId, CancellationToken ct)
+    {
+        var servicePoint = await _db.ServicePoints.FirstOrDefaultAsync(sp => sp.Id == servicePointId && sp.CustomerId == id, ct);
+        if (servicePoint is null) return NotFound();
+
+        var dtNode = await _db.HierarchyNodes.FirstOrDefaultAsync(n => n.Id == dtNodeId, ct);
+        if (dtNode is null) return NotFound($"Distribution transformer node {dtNodeId} not found.");
+
+        try
+        {
+            servicePoint.AssignDistributionTransformer(dtNode);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new ServicePointSummary(servicePoint.Id, servicePoint.Address, servicePoint.DistributionTransformerNodeId));
     }
 }
