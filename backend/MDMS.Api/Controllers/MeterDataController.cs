@@ -43,6 +43,17 @@ public class MeterDataController : ControllerBase
 
     private static (int page, int pageSize) Page(int? page, int? pageSize) => ReportPaging.Normalize(page, pageSize);
 
+    /// <summary>Looks up MeterId → SerialNumber ("Meter Number") for a batch of rows in one query —
+    /// every meter-data list endpoint surfaces the human-readable Meter Number, never just the
+    /// internal MeterId GUID, per the reference UI.</summary>
+    private async Task<Dictionary<Guid, string>> MeterNumbersAsync(IEnumerable<Guid> meterIds, CancellationToken ct)
+    {
+        var ids = meterIds.Distinct().ToList();
+        return await _db.Meters
+            .Where(m => ids.Contains(m.Id))
+            .ToDictionaryAsync(m => m.Id, m => m.SerialNumber, ct);
+    }
+
     // --------------------------------------------------------------------------- Load Survey (LS)
 
     [HttpPost("ls")]
@@ -55,6 +66,24 @@ public class MeterDataController : ControllerBase
         var results = await _ingestionService.IngestAsync(requests, ct);
         return Ok(results);
     }
+
+    /// <summary>LS row exposed to callers: the human-readable Meter Number (not the internal
+    /// MeterId GUID) plus every LS/BLP parameter from the meter-data spec — Meter Timestamp is the
+    /// interval's own end time, MDM Entry Timestamp is when MDMS itself persisted the row.</summary>
+    public record LoadSurveyRow(
+        Guid Id, Guid MeterId, string MeterNumber,
+        DateTime IntervalStartUtc, DateTime IntervalEndUtc, DateTime MdmEntryTimestampUtc,
+        decimal CumulativeReading, decimal ConsumptionKwh,
+        decimal? AverageVoltage, decimal? AverageCurrent,
+        decimal? CumulativeKvahImport, decimal? CumulativeKwhExport, decimal? CumulativeKvahExport,
+        string Quality, string Source);
+
+    private static LoadSurveyRow ToRow(LoadSurveyInterval i, IReadOnlyDictionary<Guid, string> meterNumbers) => new(
+        i.Id, i.MeterId, meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()),
+        i.IntervalStartUtc, i.IntervalEndUtc, i.CreatedAtUtc,
+        i.CumulativeReading, i.ConsumptionKwh,
+        i.AverageVoltage, i.AverageCurrent, i.CumulativeKvahImport, i.CumulativeKwhExport, i.CumulativeKvahExport,
+        i.Quality.ToString(), i.Source.ToString());
 
     [HttpGet("ls")]
     public async Task<IActionResult> ListLoadSurvey(
@@ -74,14 +103,22 @@ public class MeterDataController : ControllerBase
         if (export == "csv")
         {
             var all = await query.ToListAsync(ct);
+            var meterNumbers = await MeterNumbersAsync(all.Select(i => i.MeterId), ct);
+            var rowsForCsv = all.Select(i => ToRow(i, meterNumbers)).ToList();
             var csv = CsvWriter.Write(
-                ["Meter Id", "Interval Start (UTC)", "Interval End (UTC)", "Cumulative Reading", "Consumption (kWh)", "Quality", "Source"],
-                all, i => [i.MeterId.ToString(), i.IntervalStartUtc, i.IntervalEndUtc, i.CumulativeReading, i.ConsumptionKwh, i.Quality.ToString(), i.Source.ToString()]);
+                ["Meter Number", "Meter Timestamp (UTC)", "MDM Entry Timestamp (UTC)", "Average Voltage", "Average Current",
+                 "Cumulative Energy kWh Import", "Cumulative Energy kVAh Import", "Cumulative Energy kWh Export", "Cumulative Energy kVAh Export",
+                 "Consumption (kWh)", "Quality", "Source"],
+                rowsForCsv, r => [r.MeterNumber, r.IntervalEndUtc, r.MdmEntryTimestampUtc, r.AverageVoltage, r.AverageCurrent,
+                    r.CumulativeReading, r.CumulativeKvahImport, r.CumulativeKwhExport, r.CumulativeKvahExport,
+                    r.ConsumptionKwh, r.Quality, r.Source]);
             return File(csv, "text/csv", $"MDMS_LoadSurvey_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
-        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<LoadSurveyInterval>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        var pageRows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        var pageMeterNumbers = await MeterNumbersAsync(pageRows.Select(i => i.MeterId), ct);
+        var rows = pageRows.Select(i => ToRow(i, pageMeterNumbers)).ToList();
+        return Ok(new ListResult<LoadSurveyRow>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // ------------------------------------------------------------------------- Daily Profile (DP)
@@ -102,6 +139,15 @@ public class MeterDataController : ControllerBase
         }
     }
 
+    public record DailyLoadProfileRow(
+        Guid Id, Guid MeterId, string MeterNumber, DateOnly ProfileDate, DateTime MdmEntryTimestampUtc,
+        decimal ConsumptionKwh, decimal? KvahImport, decimal? KwhExport, decimal? KvahExport,
+        string Quality, string Source);
+
+    private static DailyLoadProfileRow ToRow(DailyLoadProfile i, IReadOnlyDictionary<Guid, string> meterNumbers) => new(
+        i.Id, i.MeterId, meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()), i.ProfileDate, i.CreatedAtUtc,
+        i.ConsumptionKwh, i.KvahImport, i.KwhExport, i.KvahExport, i.Quality.ToString(), i.Source.ToString());
+
     [HttpGet("dlp")]
     public async Task<IActionResult> ListDailyLoadProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
@@ -120,14 +166,18 @@ public class MeterDataController : ControllerBase
         if (export == "csv")
         {
             var all = await query.ToListAsync(ct);
+            var meterNumbers = await MeterNumbersAsync(all.Select(i => i.MeterId), ct);
+            var rowsForCsv = all.Select(i => ToRow(i, meterNumbers)).ToList();
             var csv = CsvWriter.Write(
-                ["Meter Id", "Profile Date", "kWh Import", "kVAh Import", "kWh Export", "kVAh Export", "Quality", "Source"],
-                all, i => [i.MeterId.ToString(), i.ProfileDate.ToString("yyyy-MM-dd"), i.ConsumptionKwh, i.KvahImport, i.KwhExport, i.KvahExport, i.Quality.ToString(), i.Source.ToString()]);
+                ["Meter Number", "Profile Date", "MDM Entry Timestamp (UTC)", "kWh Import", "kVAh Import", "kWh Export", "kVAh Export", "Quality", "Source"],
+                rowsForCsv, r => [r.MeterNumber, r.ProfileDate.ToString("yyyy-MM-dd"), r.MdmEntryTimestampUtc, r.ConsumptionKwh, r.KvahImport, r.KwhExport, r.KvahExport, r.Quality, r.Source]);
             return File(csv, "text/csv", $"MDMS_DailyProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
-        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<DailyLoadProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        var pageRows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        var pageMeterNumbers = await MeterNumbersAsync(pageRows.Select(i => i.MeterId), ct);
+        var rows = pageRows.Select(i => ToRow(i, pageMeterNumbers)).ToList();
+        return Ok(new ListResult<DailyLoadProfileRow>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // ------------------------------------------------------------------ Instantaneous Profile (IP)
@@ -178,6 +228,22 @@ public class MeterDataController : ControllerBase
         return Ok(results);
     }
 
+    public record InstantaneousProfileRow(
+        Guid Id, Guid MeterId, string MeterNumber, DateTime MeterTimeUtc,
+        decimal Voltage, decimal PhaseCurrent, decimal NeutralCurrent, decimal PowerFactor, decimal Frequency,
+        decimal Kw, decimal Kva, decimal Kwh, decimal Kvah, decimal KwhExport, decimal KvahExport,
+        decimal? MdKw, DateTime? MdKwAtUtc, decimal? MdKva, DateTime? MdKvaAtUtc,
+        decimal? MdKwExport, DateTime? MdKwExportAtUtc, decimal? MdKvaExport, DateTime? MdKvaExportAtUtc,
+        int PowerOnDurationMinutes, int TamperCount, int BillingCount, int ProgrammingCount,
+        string LoadLimitState, decimal? LoadLimitValue);
+
+    private static InstantaneousProfileRow ToRow(InstantaneousProfile i, IReadOnlyDictionary<Guid, string> meterNumbers) => new(
+        i.Id, i.MeterId, meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()), i.MeterTimeUtc,
+        i.Voltage, i.PhaseCurrent, i.NeutralCurrent, i.PowerFactor, i.Frequency,
+        i.Kw, i.Kva, i.Kwh, i.Kvah, i.KwhExport, i.KvahExport,
+        i.MdKw, i.MdKwAtUtc, i.MdKva, i.MdKvaAtUtc, i.MdKwExport, i.MdKwExportAtUtc, i.MdKvaExport, i.MdKvaExportAtUtc,
+        i.PowerOnDurationMinutes, i.TamperCount, i.BillingCount, i.ProgrammingCount, i.LoadLimitState.ToString(), i.LoadLimitValue);
+
     [HttpGet("ip")]
     public async Task<IActionResult> ListInstantaneousProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate,
@@ -196,21 +262,24 @@ public class MeterDataController : ControllerBase
         if (export == "csv")
         {
             var all = await query.ToListAsync(ct);
+            var meterNumbers = await MeterNumbersAsync(all.Select(i => i.MeterId), ct);
             var csv = CsvWriter.Write(
-                ["Meter Id", "Meter Time (UTC)", "Voltage", "Phase Current", "Neutral Current", "Power Factor", "Frequency",
+                ["Meter Number", "Meter Time (UTC)", "Voltage", "Phase Current", "Neutral Current", "Power Factor", "Frequency",
                  "kW", "kVA", "kWh", "kVAh", "kWh Export", "kVAh Export",
                  "MD kW", "MD kW At", "MD kVA", "MD kVA At", "MD kW Export", "MD kW Export At", "MD kVA Export", "MD kVA Export At",
                  "Power On Duration (min)", "Tamper Count", "Billing Count", "Programming Count", "Load Limit State", "Load Limit Value"],
                 all, i => [
-                    i.MeterId.ToString(), i.MeterTimeUtc, i.Voltage, i.PhaseCurrent, i.NeutralCurrent, i.PowerFactor, i.Frequency,
+                    meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()), i.MeterTimeUtc, i.Voltage, i.PhaseCurrent, i.NeutralCurrent, i.PowerFactor, i.Frequency,
                     i.Kw, i.Kva, i.Kwh, i.Kvah, i.KwhExport, i.KvahExport,
                     i.MdKw, i.MdKwAtUtc, i.MdKva, i.MdKvaAtUtc, i.MdKwExport, i.MdKwExportAtUtc, i.MdKvaExport, i.MdKvaExportAtUtc,
                     i.PowerOnDurationMinutes, i.TamperCount, i.BillingCount, i.ProgrammingCount, i.LoadLimitState.ToString(), i.LoadLimitValue]);
             return File(csv, "text/csv", $"MDMS_InstantaneousProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
-        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<InstantaneousProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        var pageRows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        var pageMeterNumbers = await MeterNumbersAsync(pageRows.Select(i => i.MeterId), ct);
+        var rows = pageRows.Select(i => ToRow(i, pageMeterNumbers)).ToList();
+        return Ok(new ListResult<InstantaneousProfileRow>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // ------------------------------------------------------------------------ Billing Profile (BP)
@@ -247,6 +316,18 @@ public class MeterDataController : ControllerBase
         return Ok(profile);
     }
 
+    public record BillingProfileRow(
+        Guid Id, Guid MeterId, string MeterNumber, DateOnly BillingDate,
+        decimal CumulativeKwhImport, decimal CumulativeKvahImport, decimal CumulativeKwhExport, decimal CumulativeKvahExport,
+        decimal AveragePowerFactor, decimal[] KwhByTariffZone, decimal[] KvahByTariffZone,
+        decimal MaximumDemandKw, decimal MaximumDemandKva, int BillingPowerOnDurationMinutes);
+
+    private static BillingProfileRow ToRow(BillingProfile i, IReadOnlyDictionary<Guid, string> meterNumbers) => new(
+        i.Id, i.MeterId, meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()), i.BillingDate,
+        i.CumulativeKwhImport, i.CumulativeKvahImport, i.CumulativeKwhExport, i.CumulativeKvahExport,
+        i.AveragePowerFactor, i.KwhByTariffZone, i.KvahByTariffZone,
+        i.MaximumDemandKw, i.MaximumDemandKva, i.BillingPowerOnDurationMinutes);
+
     [HttpGet("bp")]
     public async Task<IActionResult> ListBillingProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
@@ -265,9 +346,10 @@ public class MeterDataController : ControllerBase
         if (export == "csv")
         {
             var all = await query.ToListAsync(ct);
+            var meterNumbers = await MeterNumbersAsync(all.Select(i => i.MeterId), ct);
             var headers = new List<string>
             {
-                "Meter Id", "Billing Date",
+                "Meter Number", "Billing Date",
                 "Cumulative Energy kWh Import (Monthly)", "Cumulative Energy kVAh Import (Monthly)",
                 "Cumulative Energy kWh Export (Monthly)", "Cumulative Energy kVAh Export (Monthly)",
                 "Average Power Factor",
@@ -280,7 +362,7 @@ public class MeterDataController : ControllerBase
             {
                 var row = new List<object?>
                 {
-                    i.MeterId.ToString(), i.BillingDate.ToString("yyyy-MM-dd"),
+                    meterNumbers.GetValueOrDefault(i.MeterId, i.MeterId.ToString()), i.BillingDate.ToString("yyyy-MM-dd"),
                     i.CumulativeKwhImport, i.CumulativeKvahImport, i.CumulativeKwhExport, i.CumulativeKvahExport,
                     i.AveragePowerFactor,
                 };
@@ -292,8 +374,10 @@ public class MeterDataController : ControllerBase
             return File(csv, "text/csv", $"MDMS_BillingProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
-        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<BillingProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        var pageRows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        var pageMeterNumbers = await MeterNumbersAsync(pageRows.Select(i => i.MeterId), ct);
+        var rows = pageRows.Select(i => ToRow(i, pageMeterNumbers)).ToList();
+        return Ok(new ListResult<BillingProfileRow>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // --------------------------------------------------------------------------------- Events
@@ -319,12 +403,13 @@ public class MeterDataController : ControllerBase
     }
 
     public record MeterEventRow(
-        Guid Id, Guid MeterId, DateTime OccurredAtUtc, string EventType, string Classification, string Severity, string? Description,
+        Guid Id, Guid MeterId, string MeterNumber, DateTime OccurredAtUtc, string EventType, string Classification, string Severity, string? Description,
         decimal? OccCurrent, decimal? OccVoltage, decimal? OccKwh, decimal? OccTemperature,
         DateTime? ResolvedAtUtc, int? DurationMinutes, bool IsAcknowledged, DateTime? AcknowledgedAtUtc);
 
-    private static MeterEventRow ToRow(MeterEvent e) => new(
-        e.Id, e.MeterId, e.OccurredAtUtc, e.EventType.ToString(), MeterEventClassifier.Classify(e.EventType).ToString(), e.Severity.ToString(), e.Description,
+    private static MeterEventRow ToRow(MeterEvent e, IReadOnlyDictionary<Guid, string>? meterNumbers = null) => new(
+        e.Id, e.MeterId, meterNumbers?.GetValueOrDefault(e.MeterId, e.MeterId.ToString()) ?? e.MeterId.ToString(),
+        e.OccurredAtUtc, e.EventType.ToString(), MeterEventClassifier.Classify(e.EventType).ToString(), e.Severity.ToString(), e.Description,
         e.OccCurrent, e.OccVoltage, e.OccKwh, e.OccTemperature,
         e.ResolvedAtUtc, e.ResolvedAtUtc.HasValue ? (int)(e.ResolvedAtUtc.Value - e.OccurredAtUtc).TotalMinutes : null,
         e.IsAcknowledged, e.AcknowledgedAtUtc);
@@ -348,17 +433,21 @@ public class MeterDataController : ControllerBase
 
         if (export == "csv")
         {
-            var all = (await query.ToListAsync(ct)).Select(ToRow).ToList();
+            var allEntities = await query.ToListAsync(ct);
+            var meterNumbers = await MeterNumbersAsync(allEntities.Select(e => e.MeterId), ct);
+            var all = allEntities.Select(e => ToRow(e, meterNumbers)).ToList();
             var csv = CsvWriter.Write(
-                ["Meter Id", "Occurred (UTC)", "Classification", "Type", "Severity", "Description",
+                ["Meter Number", "Occurred (UTC)", "Classification", "Type", "Severity", "Description",
                  "Occ Current", "Occ Voltage", "Occ kWh", "Occ Temp", "Resolved (UTC)", "Duration (min)", "Acknowledged", "Acknowledged At (UTC)"],
-                all, e => [e.MeterId.ToString(), e.OccurredAtUtc, e.Classification, e.EventType, e.Severity, e.Description,
+                all, e => [e.MeterNumber, e.OccurredAtUtc, e.Classification, e.EventType, e.Severity, e.Description,
                     e.OccCurrent, e.OccVoltage, e.OccKwh, e.OccTemperature, e.ResolvedAtUtc, e.DurationMinutes, e.IsAcknowledged, e.AcknowledgedAtUtc]);
             return File(csv, "text/csv", $"MDMS_{filenamePrefix}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
-        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<MeterEventRow>(rows.Select(ToRow).ToList(), ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        var pageEntities = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        var pageMeterNumbers = await MeterNumbersAsync(pageEntities.Select(e => e.MeterId), ct);
+        var rows = pageEntities.Select(e => ToRow(e, pageMeterNumbers)).ToList();
+        return Ok(new ListResult<MeterEventRow>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     /// <summary>One row per (Classification, EventType) with an aggregate count and last

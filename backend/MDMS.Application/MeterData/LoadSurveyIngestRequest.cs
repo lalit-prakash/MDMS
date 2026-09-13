@@ -5,4 +5,9 @@ public record LoadSurveyIngestRequest(
     Guid MeterId,
     DateTime IntervalStartUtc,
     DateTime IntervalEndUtc,
-    decimal CumulativeReading);
+    decimal CumulativeReading,
+    decimal? AverageVoltage = null,
+    decimal? AverageCurrent = null,
+    decimal? CumulativeKvahImport = null,
+    decimal? CumulativeKwhExport = null,
+    decimal? CumulativeKvahExport = null);

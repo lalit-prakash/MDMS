@@ -31,6 +31,7 @@ interface ClassificationSummaryResponse {
 interface MeterEventRow {
   id: string;
   meterId: string;
+  meterNumber: string;
   occurredAtUtc: string;
   eventType: string;
   classification: string;
@@ -83,7 +84,7 @@ export function EventClassificationView({ endpointBase, filenamePrefix }: { endp
 
   if (selected) {
     const columns: ReportColumn<MeterEventRow>[] = [
-      { key: "meter", label: "Meter", render: (r) => r.meterId.slice(0, 8) },
+      { key: "meterNumber", label: "Meter Number", render: (r) => r.meterNumber },
       { key: "occurred", label: "Occurrence Time", render: (r) => new Date(r.occurredAtUtc).toLocaleString() },
       { key: "resolved", label: "Resolution Time", render: (r) => (r.resolvedAtUtc ? new Date(r.resolvedAtUtc).toLocaleString() : "—") },
       { key: "current", label: "Occ Current", align: "right", render: (r) => r.occCurrent ?? "—" },

@@ -21,6 +21,19 @@ public class LoadSurveyInterval : Entity
     /// <summary>Consumption for this interval alone (CumulativeReading − prior interval's CumulativeReading).</summary>
     public decimal ConsumptionKwh { get; private set; }
 
+    /// <summary>
+    /// The remaining LS/BLP parameters per the meter-data spec, beyond the cumulative-kWh-import
+    /// reading this type has always tracked (as <see cref="CumulativeReading"/>) — average
+    /// voltage/current over the block, and the kVAh import / kWh+kVAh export cumulative readings.
+    /// All nullable: set via <see cref="SetAdditionalMeasures"/> only when the ingesting caller
+    /// actually provides them, never fabricated.
+    /// </summary>
+    public decimal? AverageVoltage { get; private set; }
+    public decimal? AverageCurrent { get; private set; }
+    public decimal? CumulativeKvahImport { get; private set; }
+    public decimal? CumulativeKwhExport { get; private set; }
+    public decimal? CumulativeKvahExport { get; private set; }
+
     public MeasurementQuality Quality { get; private set; }
     public MeasurementSource Source { get; private set; }
 
@@ -48,6 +61,20 @@ public class LoadSurveyInterval : Entity
             Quality = MeasurementQuality.Valid,
             Source = source
         };
+    }
+
+    /// <summary>Sets the optional block-average/export/kVAh measures — safe to call on any
+    /// interval regardless of quality, since these are independent of the cumulative-reading
+    /// sequence validation.</summary>
+    public void SetAdditionalMeasures(
+        decimal? averageVoltage, decimal? averageCurrent,
+        decimal? cumulativeKvahImport, decimal? cumulativeKwhExport, decimal? cumulativeKvahExport)
+    {
+        AverageVoltage = averageVoltage;
+        AverageCurrent = averageCurrent;
+        CumulativeKvahImport = cumulativeKvahImport;
+        CumulativeKwhExport = cumulativeKwhExport;
+        CumulativeKvahExport = cumulativeKvahExport;
     }
 
     /// <summary>

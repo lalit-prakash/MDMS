@@ -73,6 +73,9 @@ public class LoadSurveyIngestionService
                 var rejected = LoadSurveyInterval.CreateRejected(
                     request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
                     request.CumulativeReading, MeasurementQuality.NegativeConsumption);
+                rejected.SetAdditionalMeasures(
+                    request.AverageVoltage, request.AverageCurrent,
+                    request.CumulativeKvahImport, request.CumulativeKwhExport, request.CumulativeKvahExport);
 
                 await RaiseOrReactivateHoldAsync(request.MeterId,
                     $"Negative consumption detected at interval {request.IntervalStartUtc:O}-{request.IntervalEndUtc:O} " +
@@ -89,6 +92,9 @@ public class LoadSurveyIngestionService
             var valid = LoadSurveyInterval.CreateValid(
                 request.MeterId, request.IntervalStartUtc, request.IntervalEndUtc,
                 request.CumulativeReading, consumption, MeasurementSource.Received);
+            valid.SetAdditionalMeasures(
+                request.AverageVoltage, request.AverageCurrent,
+                request.CumulativeKvahImport, request.CumulativeKwhExport, request.CumulativeKvahExport);
 
             if (!thresholdByMeter.TryGetValue(request.MeterId, out var threshold))
             {
