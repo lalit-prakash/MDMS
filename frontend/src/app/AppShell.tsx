@@ -400,7 +400,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={async () => {
                 setUserMenuAnchor(null);
                 await logout();
-                router.push("/login");
+                // replace, not push: drops the authenticated page from history so a plain "back"
+                // press can't return to it at all, independent of the bfcache fix in AuthContext.
+                router.replace("/login");
               }}
             >
               Sign out

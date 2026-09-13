@@ -117,6 +117,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [silentRefresh]);
 
+  useEffect(() => {
+    // The browser's back/forward cache (bfcache) can restore this exact page — DOM, JS heap, and
+    // all — without re-running mount effects, because from React's perspective nothing ever
+    // unmounted. If that restored snapshot was taken while signed in, the (now stale, since
+    // logout revokes the refresh cookie server-side) authenticated dashboard would just reappear
+    // with no redirect ever re-firing. A full reload forces every provider to re-initialize from
+    // scratch, which re-runs the mount-time silent-refresh above and correctly bounces to /login.
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) window.location.reload();
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   useEffect(() => onUnauthorized(clearSession), []);
 
   const login = useCallback(async (username: string, password: string) => {
