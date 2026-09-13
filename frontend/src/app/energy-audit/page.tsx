@@ -20,6 +20,8 @@ import {
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { MorphingStat } from "@/components/MorphingStat";
 
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import { PageHeader } from "@/components/PageHeader";
 interface EnergyBalanceResult {
   hierarchyNodeId: string;
   date: string;
@@ -80,9 +82,7 @@ export default function EnergyAuditPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Energy Audit
-      </Typography>
+      <PageHeader icon={<InsightsOutlinedIcon fontSize="small" />} title="Energy Audit" />
       <Alert severity="info" sx={{ mb: 3 }}>
         No feeder/DTR meter ingestion pipeline exists yet — a supply-side reading is entered
         manually below rather than derived from a real boundary meter feed.

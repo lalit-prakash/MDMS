@@ -21,6 +21,8 @@ import { apiClient, ApiError } from "@/lib/apiClient";
 import { Meter, MeterPhase } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
+import ElectricMeterOutlinedIcon from "@mui/icons-material/ElectricMeterOutlined";
+import { PageHeader } from "@/components/PageHeader";
 export default function MetersPage() {
   const queryClient = useQueryClient();
   const [serialNumber, setSerialNumber] = useState("");
@@ -46,9 +48,7 @@ export default function MetersPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Meters
-      </Typography>
+      <PageHeader icon={<ElectricMeterOutlinedIcon fontSize="small" />} title="Meters" />
 
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Typography variant="subtitle1" gutterBottom>

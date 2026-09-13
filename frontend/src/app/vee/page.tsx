@@ -21,6 +21,8 @@ import { apiClient, ApiError } from "@/lib/apiClient";
 import { MeasurementRangeThreshold, MeasurementRangeType, VeeExecutionRecord } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import { PageHeader } from "@/components/PageHeader";
 export default function VeePage() {
   const queryClient = useQueryClient();
   const [measurementType, setMeasurementType] = useState<MeasurementRangeType>("LoadSurveyInterval");
@@ -65,9 +67,7 @@ export default function VeePage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        VEE
-      </Typography>
+      <PageHeader icon={<FactCheckOutlinedIcon fontSize="small" />} title="VEE" />
 
       <Typography variant="h6" sx={{ mb: 1 }}>
         Out-of-range thresholds

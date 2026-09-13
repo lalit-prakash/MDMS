@@ -23,6 +23,8 @@ import { apiClient, ApiError } from "@/lib/apiClient";
 import { Complaint, ComplaintSource } from "@/lib/complaints";
 import { StatusBadge } from "@/components/StatusBadge";
 
+import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
+import { PageHeader } from "@/components/PageHeader";
 const SOURCES: ComplaintSource[] = ["ConsumerPortal", "MobileApp", "Helpline1912"];
 
 export default function ComplaintsPage() {
@@ -72,9 +74,7 @@ export default function ComplaintsPage() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-        Complaints
-      </Typography>
+      <PageHeader icon={<SupportAgentOutlinedIcon fontSize="small" />} title="Complaints" />
 
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         {error && (
