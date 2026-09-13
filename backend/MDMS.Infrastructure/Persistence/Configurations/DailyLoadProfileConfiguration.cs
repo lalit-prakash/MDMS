@@ -13,6 +13,9 @@ public class DailyLoadProfileConfiguration : IEntityTypeConfiguration<DailyLoadP
         builder.Property(p => p.Source).HasConversion<int>();
         builder.Property(p => p.Quality).HasConversion<int>();
         builder.Property(p => p.ConsumptionKwh).HasColumnType("numeric(18,4)");
+        builder.Property(p => p.KvahImport).HasColumnType("numeric(18,4)");
+        builder.Property(p => p.KwhExport).HasColumnType("numeric(18,4)");
+        builder.Property(p => p.KvahExport).HasColumnType("numeric(18,4)");
 
         builder.HasIndex(p => new { p.ServicePointId, p.MeterId, p.ProfileDate }).IsUnique();
     }

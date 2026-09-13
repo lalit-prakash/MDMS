@@ -51,7 +51,8 @@ public class DailyLoadProfileIngestionService
         }
 
         var received = DailyLoadProfile.CreateReceived(
-            request.ServicePointId, request.MeterId, request.ProfileDate, request.ConsumptionKwh);
+            request.ServicePointId, request.MeterId, request.ProfileDate, request.ConsumptionKwh,
+            request.KvahImport, request.KwhExport, request.KvahExport);
 
         var threshold = await _outOfRangeValidationService.GetEffectiveThresholdAsync(
             request.MeterId, MeasurementRangeType.DailyLoadProfile, cancellationToken);

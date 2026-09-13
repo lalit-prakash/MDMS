@@ -16,6 +16,9 @@ public interface IMdmsDbContext
     DbSet<MeterAssignment> MeterAssignments { get; }
     DbSet<LoadSurveyInterval> LoadSurveyIntervals { get; }
     DbSet<DailyLoadProfile> DailyLoadProfiles { get; }
+    DbSet<InstantaneousProfile> InstantaneousProfiles { get; }
+    DbSet<BillingProfile> BillingProfiles { get; }
+    DbSet<MeterEvent> MeterEvents { get; }
     DbSet<DataQualityHold> DataQualityHolds { get; }
     DbSet<VeeRuleDefinition> VeeRuleDefinitions { get; }
     DbSet<MeasurementRangeThreshold> MeasurementRangeThresholds { get; }

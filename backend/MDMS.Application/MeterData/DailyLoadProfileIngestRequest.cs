@@ -5,4 +5,7 @@ public record DailyLoadProfileIngestRequest(
     Guid ServicePointId,
     Guid MeterId,
     DateOnly ProfileDate,
-    decimal ConsumptionKwh);
+    decimal ConsumptionKwh,
+    decimal? KvahImport = null,
+    decimal? KwhExport = null,
+    decimal? KvahExport = null);

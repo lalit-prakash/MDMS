@@ -39,6 +39,9 @@ export interface DailyLoadProfile {
   meterId: string;
   profileDate: string;
   consumptionKwh: number;
+  kvahImport: number | null;
+  kwhExport: number | null;
+  kvahExport: number | null;
   source: MeasurementSource;
   quality: MeasurementQuality;
 }
