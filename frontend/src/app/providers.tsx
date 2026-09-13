@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, CssBaseline } from "@mui/material";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { useMemo, useState } from "react";
 import { ThemeModeProvider, useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { buildMuiTheme } from "@/lib/theme/muiTheme";
@@ -30,10 +31,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeModeProvider>
-        <MuiThemeBridge>{children}</MuiThemeBridge>
-      </ThemeModeProvider>
-    </QueryClientProvider>
+    // Emotion (MUI's styling engine) needs its own cache provider on the App Router: without it,
+    // the client re-inserts <style> tags in a different order/insertion-point than the server
+    // rendered, which React's hydration diff sees as a mismatched tree (a <style data-emotion>
+    // node vs. a <div>) even though nothing about our own markup changed.
+    <AppRouterCacheProvider options={{ key: "mui" }}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeModeProvider>
+          <MuiThemeBridge>{children}</MuiThemeBridge>
+        </ThemeModeProvider>
+      </QueryClientProvider>
+    </AppRouterCacheProvider>
   );
 }
