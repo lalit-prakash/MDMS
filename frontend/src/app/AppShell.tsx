@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
+  Autocomplete,
+  Avatar,
+  Badge,
   Box,
   Drawer,
   IconButton,
@@ -11,6 +15,9 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
+  TextField,
   Toolbar,
   Tooltip,
   Typography,
@@ -21,6 +28,8 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ChevronLeftOutlinedIcon from "@mui/icons-material/ChevronLeftOutlined";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import SpaceDashboardOutlinedIcon from "@mui/icons-material/SpaceDashboardOutlined";
 import ElectricMeterOutlinedIcon from "@mui/icons-material/ElectricMeterOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
@@ -33,6 +42,10 @@ import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import { useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
+import { useAuth } from "@/lib/session/AuthContext";
+import { apiClient } from "@/lib/apiClient";
+import { Complaint } from "@/lib/complaints";
+import { RevenueProtectionLead } from "@/lib/revenueProtection";
 
 const SIDEBAR_WIDTH = 248;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
@@ -57,7 +70,7 @@ const GROUPS: ModuleGroup[] = [
     items: [
       { label: "Meters", href: "/meters", icon: ElectricMeterOutlinedIcon },
       { label: "Meter Data", href: "/meter-data", icon: StorageOutlinedIcon },
-      { label: "VEE", href: "/vee", icon: FactCheckOutlinedIcon },
+      { label: "VEE & Data Quality", href: "/vee", icon: FactCheckOutlinedIcon },
     ],
   },
   {
@@ -77,8 +90,8 @@ const GROUPS: ModuleGroup[] = [
   {
     label: "Administration",
     items: [
-      { label: "Config", href: "/config", icon: TuneOutlinedIcon },
-      { label: "Users", href: "/users", icon: GroupOutlinedIcon },
+      { label: "Configuration", href: "/config", icon: TuneOutlinedIcon },
+      { label: "Users & Access", href: "/users", icon: GroupOutlinedIcon },
     ],
   },
 ];
@@ -211,13 +224,44 @@ function SidebarContent({
   );
 }
 
+/** Bell badge count: a real sum of open complaints + open investigations, not a fabricated number. */
+function useAlertCount() {
+  const complaintsQuery = useQuery({
+    queryKey: ["dashboard-complaints"],
+    queryFn: () => apiClient.get<Complaint[]>("/api/v1/complaints"),
+    retry: false,
+  });
+  const leadsQuery = useQuery({
+    queryKey: ["dashboard-revenue-protection-leads"],
+    queryFn: () => apiClient.get<RevenueProtectionLead[]>("/api/v1/revenue-protection/leads"),
+    retry: false,
+  });
+  const openComplaints = complaintsQuery.data?.filter((c) => c.status !== "Resolved" && c.status !== "Closed").length ?? 0;
+  const openLeads = leadsQuery.data?.filter((l) => l.status !== "Closed").length ?? 0;
+  return openComplaints + openLeads;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { mode, toggleMode } = useThemeMode();
+  const { user, ready, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
   const isDesktop = useMediaQuery("(min-width:900px)");
+  const alertCount = useAlertCount();
+
+  const isLoginRoute = pathname === "/login";
+
+  // Real auth (JWT access token + refresh cookie) — see lib/session/AuthContext.tsx. This gates
+  // the UI's own navigation; the backend enforces the same requirement independently on every
+  // controller endpoint, so this redirect is a UX convenience, not the actual security boundary.
+  useEffect(() => {
+    if (ready && !user && !isLoginRoute) {
+      router.replace("/login");
+    }
+  }, [ready, user, isLoginRoute, router]);
 
   const currentModule = MODULES.find((m) => isActive(pathname, m.href));
   const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH;
@@ -227,6 +271,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname === href) return;
     navigateWithViewTransition((h) => router.push(h), href);
   };
+
+  if (isLoginRoute) {
+    return <>{children}</>;
+  }
+
+  if (!ready || !user) {
+    // Avoids flashing the full app shell for a signed-out visitor before the redirect above fires.
+    return <Box sx={{ minHeight: "100vh", bgcolor: "var(--color-bg-app)" }} />;
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "var(--color-bg-app)" }}>
@@ -271,7 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             bgcolor: "var(--color-bg-header)",
             borderBottom: "1px solid var(--header-border)",
             px: "var(--space-6)",
-            gap: "var(--space-2)",
+            gap: "var(--space-3)",
           }}
         >
           {!isDesktop && (
@@ -279,9 +332,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography sx={{ flex: 1, color: "var(--header-text)", fontSize: 14, fontWeight: 500 }}>
-            {currentModule?.label ?? "MDMS"}
-          </Typography>
+
+          {isDesktop ? (
+            <Autocomplete
+              size="small"
+              options={MODULES}
+              getOptionLabel={(m) => m.label}
+              onChange={(_e, value) => value && handleNavigate(value.href)}
+              sx={{ width: 320 }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Search meters, consumers, complaints…"
+                  slotProps={{
+                    ...params.slotProps,
+                    input: {
+                      ...params.slotProps.input,
+                      startAdornment: <SearchOutlinedIcon fontSize="small" sx={{ color: "var(--card-muted)", mr: 0.5 }} />,
+                    },
+                  }}
+                />
+              )}
+            />
+          ) : (
+            <Typography sx={{ flex: 1, color: "var(--header-text)", fontSize: 14, fontWeight: 500 }}>
+              {currentModule?.label ?? "MDMS"}
+            </Typography>
+          )}
+
+          <Box sx={{ flex: 1 }} />
+
+          <Tooltip title={alertCount > 0 ? `${alertCount} open items` : "No open items"}>
+            <IconButton sx={{ color: "var(--header-icon)" }}>
+              <Badge badgeContent={alertCount} color="error">
+                <NotificationsNoneOutlinedIcon fontSize="small" />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+
           <IconButton
             onClick={toggleMode}
             aria-label="Toggle color mode"
@@ -292,6 +380,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             {mode === "light" ? <DarkModeOutlinedIcon fontSize="small" /> : <LightModeOutlinedIcon fontSize="small" />}
           </IconButton>
+
+          <Box
+            onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+            sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer", pl: 1 }}
+          >
+            <Avatar sx={{ width: 32, height: 32, bgcolor: "var(--color-accent)", color: "#fff", fontSize: 14 }}>
+              {user.displayName.slice(0, 1).toUpperCase()}
+            </Avatar>
+            {isDesktop && (
+              <Box sx={{ lineHeight: 1.1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: "var(--header-text)" }}>{user.displayName}</Typography>
+                <Typography sx={{ fontSize: 11, color: "var(--card-muted)" }}>{user.role}</Typography>
+              </Box>
+            )}
+          </Box>
+          <Menu anchorEl={userMenuAnchor} open={!!userMenuAnchor} onClose={() => setUserMenuAnchor(null)}>
+            <MenuItem
+              onClick={async () => {
+                setUserMenuAnchor(null);
+                await logout();
+                // replace, not push: drops the authenticated page from history so a plain "back"
+                // press can't return to it at all, independent of the bfcache fix in AuthContext.
+                router.replace("/login");
+              }}
+            >
+              Sign out
+            </MenuItem>
+          </Menu>
         </Toolbar>
 
         <Box component="main" sx={{ maxWidth: 1200, mx: "auto", px: "var(--space-6)", py: "var(--space-8)" }}>

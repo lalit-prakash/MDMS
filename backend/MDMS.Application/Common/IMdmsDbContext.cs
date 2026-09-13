@@ -23,6 +23,7 @@ public interface IMdmsDbContext
     DbSet<HierarchyNode> HierarchyNodes { get; }
     DbSet<OrgUnit> OrgUnits { get; }
     DbSet<User> Users { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<VeeExecutionRecord> VeeExecutionRecords { get; }
     DbSet<NetworkEnergyReading> NetworkEnergyReadings { get; }
     DbSet<Complaint> Complaints { get; }

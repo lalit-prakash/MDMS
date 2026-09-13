@@ -124,4 +124,6 @@ export interface MdmsUser {
   displayName: string;
   role: UserRole;
   orgUnitId: string | null;
+  hasPassword: boolean;
+  createdAtUtc: string;
 }
