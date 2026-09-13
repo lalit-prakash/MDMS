@@ -1,10 +1,15 @@
+using System.Text.Json.Serialization;
 using MDMS.Infrastructure;
 using MDMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+// Enums as strings ("Single", "Open", ...) rather than the framework's numeric default —
+// every enum in this API is domain-meaningful and every client (this project's own frontend
+// included) reasons about them by name, not by an arbitrary underlying int.
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
