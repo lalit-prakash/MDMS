@@ -54,6 +54,88 @@ public class MeterDataController : ControllerBase
             .ToDictionaryAsync(m => m.Id, m => m.SerialNumber, ct);
     }
 
+    /// <summary>
+    /// Resolves Feeder/DTR/Region-Zone-Circle-Division-SubDivision filters down to the concrete
+    /// set of MeterIds they cover, by walking Meter → (active) MeterAssignment → ServicePoint →
+    /// DT node → Feeder node → Substation node → OrgUnit, the same real hierarchy
+    /// <see cref="NetworkController"/> and <see cref="CustomersController"/> resolve — never a
+    /// fabricated mapping. Returns null when no hierarchy filter was requested (meaning: don't
+    /// restrict by meter at all), so callers can tell "no filter" from "filter matched nothing".
+    /// </summary>
+    private async Task<HashSet<Guid>?> ResolveHierarchyMeterIdsAsync(
+        Guid? orgUnitId, Guid? feederNodeId, Guid? dtNodeId, CancellationToken ct)
+    {
+        if (orgUnitId is null && feederNodeId is null && dtNodeId is null)
+            return null;
+
+        var nodes = await _db.HierarchyNodes.ToListAsync(ct);
+        var nodesById = nodes.ToDictionary(n => n.Id);
+        var orgUnits = await _db.OrgUnits.ToListAsync(ct);
+        var orgUnitsById = orgUnits.ToDictionary(u => u.Id);
+
+        (string? zone, string? circle, string? division, string? subDivision, string? section) ResolveChain(Guid? id)
+        {
+            string? zone = null, circle = null, division = null, subDivision = null, section = null;
+            var current = id.HasValue && orgUnitsById.TryGetValue(id.Value, out var start) ? start : null;
+            while (current is not null)
+            {
+                switch (current.UnitType)
+                {
+                    case OrgUnitType.Zone: zone = current.Name; break;
+                    case OrgUnitType.Circle: circle = current.Name; break;
+                    case OrgUnitType.Division: division = current.Name; break;
+                    case OrgUnitType.SubDivision: subDivision = current.Name; break;
+                    case OrgUnitType.Section: section = current.Name; break;
+                }
+                current = current.ParentId.HasValue && orgUnitsById.TryGetValue(current.ParentId.Value, out var parent) ? parent : null;
+            }
+            return (zone, circle, division, subDivision, section);
+        }
+
+        var targetChain = orgUnitId.HasValue ? ResolveChain(orgUnitId) : ((string?, string?, string?, string?, string?)?)null;
+
+        bool NodeMatches(HierarchyNode? dt)
+        {
+            if (dt is null) return false;
+            if (dtNodeId.HasValue && dt.Id != dtNodeId) return false;
+
+            var feeder = dt.ParentId.HasValue && nodesById.TryGetValue(dt.ParentId.Value, out var f) ? f : null;
+            if (feederNodeId.HasValue && feeder?.Id != feederNodeId) return false;
+
+            if (targetChain.HasValue)
+            {
+                var substation = feeder?.ParentId.HasValue == true && nodesById.TryGetValue(feeder.ParentId!.Value, out var s) ? s : null;
+                var chain = ResolveChain(substation?.OrgUnitId);
+                var t = targetChain.Value;
+                var matches = (t.Item1 is not null && t.Item1 == chain.zone)
+                    || (t.Item2 is not null && t.Item2 == chain.circle)
+                    || (t.Item3 is not null && t.Item3 == chain.division)
+                    || (t.Item4 is not null && t.Item4 == chain.subDivision)
+                    || (t.Item5 is not null && t.Item5 == chain.section);
+                if (!matches) return false;
+            }
+
+            return true;
+        }
+
+        var matchingDtIds = nodes
+            .Where(n => n.NodeType == HierarchyNodeType.DistributionTransformer && NodeMatches(n))
+            .Select(n => n.Id)
+            .ToHashSet();
+
+        var servicePointIds = await _db.ServicePoints
+            .Where(sp => sp.DistributionTransformerNodeId.HasValue && matchingDtIds.Contains(sp.DistributionTransformerNodeId.Value))
+            .Select(sp => sp.Id)
+            .ToListAsync(ct);
+
+        var meterIds = await _db.MeterAssignments
+            .Where(a => servicePointIds.Contains(a.ServicePointId) && a.EffectiveToUtc == null)
+            .Select(a => a.MeterId)
+            .ToListAsync(ct);
+
+        return meterIds.ToHashSet();
+    }
+
     // --------------------------------------------------------------------------- Load Survey (LS)
 
     [HttpPost("ls")]
@@ -88,12 +170,15 @@ public class MeterDataController : ControllerBase
     [HttpGet("ls")]
     public async Task<IActionResult> ListLoadSurvey(
         [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
+        var hierarchyMeterIds = await ResolveHierarchyMeterIdsAsync(orgUnitId, feederNodeId, dtNodeId, ct);
 
         var query = _db.LoadSurveyIntervals.AsQueryable();
         if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (hierarchyMeterIds is not null) query = query.Where(i => hierarchyMeterIds.Contains(i.MeterId));
         if (fromDate.HasValue) query = query.Where(i => i.IntervalStartUtc >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(i => i.IntervalStartUtc <= toDate.Value);
         query = query.OrderByDescending(i => i.IntervalEndUtc);
@@ -151,12 +236,15 @@ public class MeterDataController : ControllerBase
     [HttpGet("dlp")]
     public async Task<IActionResult> ListDailyLoadProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
+        var hierarchyMeterIds = await ResolveHierarchyMeterIdsAsync(orgUnitId, feederNodeId, dtNodeId, ct);
 
         var query = _db.DailyLoadProfiles.AsQueryable();
         if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (hierarchyMeterIds is not null) query = query.Where(i => hierarchyMeterIds.Contains(i.MeterId));
         if (fromDate.HasValue) query = query.Where(i => i.ProfileDate >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(i => i.ProfileDate <= toDate.Value);
         query = query.OrderByDescending(i => i.ProfileDate);
@@ -247,12 +335,15 @@ public class MeterDataController : ControllerBase
     [HttpGet("ip")]
     public async Task<IActionResult> ListInstantaneousProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
+        var hierarchyMeterIds = await ResolveHierarchyMeterIdsAsync(orgUnitId, feederNodeId, dtNodeId, ct);
 
         var query = _db.InstantaneousProfiles.AsQueryable();
         if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (hierarchyMeterIds is not null) query = query.Where(i => hierarchyMeterIds.Contains(i.MeterId));
         if (fromDate.HasValue) query = query.Where(i => i.MeterTimeUtc >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(i => i.MeterTimeUtc <= toDate.Value);
         query = query.OrderByDescending(i => i.MeterTimeUtc);
@@ -331,12 +422,15 @@ public class MeterDataController : ControllerBase
     [HttpGet("bp")]
     public async Task<IActionResult> ListBillingProfiles(
         [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
+        var hierarchyMeterIds = await ResolveHierarchyMeterIdsAsync(orgUnitId, feederNodeId, dtNodeId, ct);
 
         var query = _db.BillingProfiles.AsQueryable();
         if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (hierarchyMeterIds is not null) query = query.Where(i => hierarchyMeterIds.Contains(i.MeterId));
         if (fromDate.HasValue) query = query.Where(i => i.BillingDate >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(i => i.BillingDate <= toDate.Value);
         query = query.OrderByDescending(i => i.BillingDate);
@@ -417,12 +511,15 @@ public class MeterDataController : ControllerBase
     private async Task<IActionResult> ListMeterEventsBySeverity(
         MeterEventSeverity[] severities, string filenamePrefix,
         Guid? meterId, DateTime? fromDate, DateTime? toDate, bool? acknowledged, MeterEventType? eventType,
+        Guid? orgUnitId, Guid? feederNodeId, Guid? dtNodeId,
         int? page, int? pageSize, string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
+        var hierarchyMeterIds = await ResolveHierarchyMeterIdsAsync(orgUnitId, feederNodeId, dtNodeId, ct);
 
         var query = _db.MeterEvents.Where(e => severities.Contains(e.Severity));
         if (meterId.HasValue) query = query.Where(e => e.MeterId == meterId.Value);
+        if (hierarchyMeterIds is not null) query = query.Where(e => hierarchyMeterIds.Contains(e.MeterId));
         if (fromDate.HasValue) query = query.Where(e => e.OccurredAtUtc >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(e => e.OccurredAtUtc <= toDate.Value);
         if (acknowledged.HasValue) query = query.Where(e => e.IsAcknowledged == acknowledged.Value);
@@ -487,8 +584,9 @@ public class MeterDataController : ControllerBase
     [HttpGet("events")]
     public Task<IActionResult> ListEvents(
         [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged, [FromQuery] MeterEventType? eventType,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
-        => ListMeterEventsBySeverity([MeterEventSeverity.Info], "Events", meterId, fromDate, toDate, acknowledged, eventType, page, pageSize, export, ct);
+        => ListMeterEventsBySeverity([MeterEventSeverity.Info], "Events", meterId, fromDate, toDate, acknowledged, eventType, orgUnitId, feederNodeId, dtNodeId, page, pageSize, export, ct);
 
     [HttpGet("events/classification-summary")]
     public Task<IActionResult> EventsClassificationSummary(
@@ -502,8 +600,9 @@ public class MeterDataController : ControllerBase
     [HttpGet("alarms")]
     public Task<IActionResult> ListAlarms(
         [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged, [FromQuery] MeterEventType? eventType,
+        [FromQuery] Guid? orgUnitId, [FromQuery] Guid? feederNodeId, [FromQuery] Guid? dtNodeId,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
-        => ListMeterEventsBySeverity([MeterEventSeverity.Warning, MeterEventSeverity.Critical], "Alarms", meterId, fromDate, toDate, acknowledged, eventType, page, pageSize, export, ct);
+        => ListMeterEventsBySeverity([MeterEventSeverity.Warning, MeterEventSeverity.Critical], "Alarms", meterId, fromDate, toDate, acknowledged, eventType, orgUnitId, feederNodeId, dtNodeId, page, pageSize, export, ct);
 
     [HttpGet("alarms/classification-summary")]
     public Task<IActionResult> AlarmsClassificationSummary(

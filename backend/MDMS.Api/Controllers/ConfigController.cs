@@ -115,6 +115,50 @@ public class ConfigController : ControllerBase
         return Ok(node);
     }
 
+    public record AssignOrgUnitRequest(Guid OrgUnitId);
+
+    /// <summary>Links a Substation to its administrative office — the join that lets a Region/
+    /// Zone/Circle/Division/Sub-Division filter resolve down to Feeders/DTRs/Consumers via
+    /// <see cref="NetworkController"/>.</summary>
+    [HttpPost("hierarchy/{id:guid}/org-unit")]
+    public async Task<IActionResult> AssignOrgUnit(Guid id, [FromBody] AssignOrgUnitRequest request, CancellationToken ct)
+    {
+        var node = await _db.HierarchyNodes.FirstOrDefaultAsync(n => n.Id == id, ct);
+        if (node is null) return NotFound();
+
+        var orgUnit = await _db.OrgUnits.FirstOrDefaultAsync(u => u.Id == request.OrgUnitId, ct);
+        if (orgUnit is null) return NotFound($"Org unit {request.OrgUnitId} not found.");
+
+        try
+        {
+            node.AssignOrgUnit(orgUnit);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(node);
+    }
+
+    public record SetHierarchyMasterDataRequest(
+        decimal? CapacityKva, string? VoltageLevel, string? Make,
+        DateOnly? CommissionedOn, string? OperationalStatus, decimal? Latitude, decimal? Longitude);
+
+    /// <summary>Sets the optional Feeder/DTR master-data fields (capacity, make, commissioning
+    /// date, etc.) per the reference Feeder/DTR master-info sheets.</summary>
+    [HttpPost("hierarchy/{id:guid}/master-data")]
+    public async Task<IActionResult> SetHierarchyMasterData(Guid id, [FromBody] SetHierarchyMasterDataRequest request, CancellationToken ct)
+    {
+        var node = await _db.HierarchyNodes.FirstOrDefaultAsync(n => n.Id == id, ct);
+        if (node is null) return NotFound();
+
+        node.SetMasterData(request.CapacityKva, request.VoltageLevel, request.Make, request.CommissionedOn, request.OperationalStatus, request.Latitude, request.Longitude);
+        await _db.SaveChangesAsync(ct);
+        return Ok(node);
+    }
+
     // ----- Organizational hierarchy (Zone / Circle / Division / Sub Division / Section) -----
 
     public record CreateOrgUnitRequest(OrgUnitType UnitType, Guid? ParentId, string Code, string Name);

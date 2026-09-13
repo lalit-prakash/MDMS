@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ReportColumn } from "@/components/reports/ReportTable";
 import { MeterDataListTab } from "@/components/reports/MeterDataListTab";
 import { EventClassificationView } from "@/components/reports/EventClassificationView";
+import { HierarchyFilter } from "@/components/reports/HierarchyFilter";
 
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import { PageHeader } from "@/components/PageHeader";
@@ -195,8 +196,12 @@ function eventColumns(acknowledge: ReturnType<typeof useAcknowledge>): ReportCol
 
 export default function MeterDataPage() {
   const [tab, setTab] = useState<DataTab>("ls");
+  const [orgUnitId, setOrgUnitId] = useState("");
 
   const acknowledgeAlarms = useAcknowledge("/api/v1/meter-data/alarms");
+
+  const hierarchyFilter = <HierarchyFilter value={orgUnitId} onChange={setOrgUnitId} />;
+  const hierarchyParams = orgUnitId ? { orgUnitId } : undefined;
 
   return (
     <Box>
@@ -212,9 +217,11 @@ export default function MeterDataPage() {
         <MeterDataListTab<LoadSurveyRow>
           title="Load Survey (LS)"
           endpoint="/api/v1/meter-data/ls"
+          fixedParams={hierarchyParams}
           filenamePrefix="MDMS_LoadSurvey"
           columns={lsColumns}
           rowKey={(r) => r.id}
+          extraFilters={hierarchyFilter}
         />
       )}
 
@@ -222,10 +229,12 @@ export default function MeterDataPage() {
         <MeterDataListTab<DailyLoadProfileRow>
           title="Daily Profile (DP)"
           endpoint="/api/v1/meter-data/dlp"
+          fixedParams={hierarchyParams}
           filenamePrefix="MDMS_DailyProfile"
           columns={dlpColumns}
           rowKey={(r) => r.id}
           dateFieldType="date"
+          extraFilters={hierarchyFilter}
         />
       )}
 
@@ -233,9 +242,11 @@ export default function MeterDataPage() {
         <MeterDataListTab<InstantaneousProfile>
           title="Instantaneous Profile (IP)"
           endpoint="/api/v1/meter-data/ip"
+          fixedParams={hierarchyParams}
           filenamePrefix="MDMS_InstantaneousProfile"
           columns={ipColumns}
           rowKey={(r) => r.id}
+          extraFilters={hierarchyFilter}
         />
       )}
 
@@ -243,24 +254,28 @@ export default function MeterDataPage() {
         <MeterDataListTab<BillingProfile>
           title="Billing Profile (BP)"
           endpoint="/api/v1/meter-data/bp"
+          fixedParams={hierarchyParams}
           filenamePrefix="MDMS_BillingProfile"
           columns={bpColumns}
           rowKey={(r) => r.id}
           dateFieldType="date"
+          extraFilters={hierarchyFilter}
         />
       )}
 
       {tab === "events" && (
-        <EventClassificationView endpointBase="/api/v1/meter-data/events" filenamePrefix="MDMS_Events" />
+        <EventClassificationView endpointBase="/api/v1/meter-data/events" filenamePrefix="MDMS_Events" fixedParams={hierarchyParams} extraFilters={hierarchyFilter} />
       )}
 
       {tab === "alarms" && (
         <MeterDataListTab<MeterEvent>
           title="Alarm Details"
           endpoint="/api/v1/meter-data/alarms"
+          fixedParams={hierarchyParams}
           filenamePrefix="MDMS_Alarms"
           columns={eventColumns(acknowledgeAlarms)}
           rowKey={(r) => r.id}
+          extraFilters={hierarchyFilter}
         />
       )}
     </Box>

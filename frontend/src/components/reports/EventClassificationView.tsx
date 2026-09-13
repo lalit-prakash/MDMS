@@ -63,13 +63,27 @@ const CLASSIFICATIONS = [
  * matching the reference UI's Event Count by Classification / Event Summary / Consumer Event
  * Details flow. Alarms and Events use the same component against their own endpoint base.
  */
-export function EventClassificationView({ endpointBase, filenamePrefix }: { endpointBase: string; filenamePrefix: string }) {
+export function EventClassificationView({
+  endpointBase,
+  filenamePrefix,
+  fixedParams,
+  extraFilters,
+}: {
+  endpointBase: string;
+  filenamePrefix: string;
+  /** Query params (e.g. orgUnitId from the hierarchy filter) baked into both the classification
+   * summary and the drill-down list, so a Region/Zone/Circle/Division/Sub-Division selection
+   * scopes this whole view, not just the occurrence table. */
+  fixedParams?: Record<string, string>;
+  extraFilters?: React.ReactNode;
+}) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<{ classification: string; eventType: string } | null>(null);
 
+  const summaryQueryString = fixedParams && Object.keys(fixedParams).length > 0 ? `?${new URLSearchParams(fixedParams).toString()}` : "";
   const summaryQuery = useQuery({
-    queryKey: ["report", `${endpointBase}/classification-summary`],
-    queryFn: () => apiClient.get<ClassificationSummaryResponse>(`${endpointBase}/classification-summary`),
+    queryKey: ["report", `${endpointBase}/classification-summary`, fixedParams],
+    queryFn: () => apiClient.get<ClassificationSummaryResponse>(`${endpointBase}/classification-summary${summaryQueryString}`),
     enabled: !selected,
   });
 
@@ -130,10 +144,11 @@ export function EventClassificationView({ endpointBase, filenamePrefix }: { endp
         <MeterDataListTab<MeterEventRow>
           title={selected.eventType}
           endpoint={endpointBase}
-          fixedParams={{ eventType: selected.eventType }}
+          fixedParams={{ eventType: selected.eventType, ...fixedParams }}
           filenamePrefix={`${filenamePrefix}_${selected.eventType}`}
           columns={columns}
           rowKey={(r) => r.id}
+          extraFilters={extraFilters}
         />
       </Box>
     );
@@ -143,6 +158,11 @@ export function EventClassificationView({ endpointBase, filenamePrefix }: { endp
 
   return (
     <Box>
+      {extraFilters && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ flexWrap: "wrap", mb: 2 }}>
+          {extraFilters}
+        </Stack>
+      )}
       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
         Event Count by Classification
       </Typography>

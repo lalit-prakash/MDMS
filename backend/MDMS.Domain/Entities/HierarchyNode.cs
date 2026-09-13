@@ -21,6 +21,29 @@ public class HierarchyNode : Entity
     public Guid? ParentId { get; private set; }
     public HierarchyNode? Parent { get; private set; }
 
+    /// <summary>
+    /// The organizational unit (<see cref="OrgUnit"/>, normally a Section) this node's
+    /// administrative office falls under — only ever set on a Substation, the electrical
+    /// hierarchy's top level, since that's the only level with an independent office assignment;
+    /// a Feeder/DT inherits its office through its Substation ancestor. Lets a Region/Zone/
+    /// Circle/Division/Sub-Division filter resolve to a set of Substations (and everything
+    /// beneath them) without duplicating the org chain on every node.
+    /// </summary>
+    public Guid? OrgUnitId { get; private set; }
+
+    /// <summary>
+    /// Master-data fields shared by Feeder and DT master lists per the reference Feeder/DTR
+    /// Excel sheets — all nullable and set only when the caller actually supplies them via
+    /// <see cref="SetMasterData"/>, never fabricated.
+    /// </summary>
+    public decimal? CapacityKva { get; private set; }
+    public string? VoltageLevel { get; private set; }
+    public string? Make { get; private set; }
+    public DateOnly? CommissionedOn { get; private set; }
+    public string? OperationalStatus { get; private set; }
+    public decimal? Latitude { get; private set; }
+    public decimal? Longitude { get; private set; }
+
     private HierarchyNode() { }
 
     /// <summary>A top-level <see cref="HierarchyNodeType.Substation"/> node has no parent.</summary>
@@ -65,6 +88,31 @@ public class HierarchyNode : Entity
             Name = RequireName(name),
             ParentId = parent.Id
         };
+    }
+
+    /// <summary>Links this node's administrative office. Only meaningful on a Substation — see
+    /// <see cref="OrgUnitId"/>.</summary>
+    public void AssignOrgUnit(OrgUnit orgUnit)
+    {
+        ArgumentNullException.ThrowIfNull(orgUnit);
+        if (NodeType != HierarchyNodeType.Substation)
+            throw new InvalidOperationException($"Only a Substation carries an OrgUnit assignment (was {NodeType}).");
+        OrgUnitId = orgUnit.Id;
+    }
+
+    /// <summary>Sets the optional Feeder/DT master-data fields. Safe to call on any node
+    /// regardless of type.</summary>
+    public void SetMasterData(
+        decimal? capacityKva, string? voltageLevel, string? make,
+        DateOnly? commissionedOn, string? operationalStatus, decimal? latitude, decimal? longitude)
+    {
+        CapacityKva = capacityKva;
+        VoltageLevel = voltageLevel;
+        Make = make;
+        CommissionedOn = commissionedOn;
+        OperationalStatus = operationalStatus;
+        Latitude = latitude;
+        Longitude = longitude;
     }
 
     private static string RequireCode(string code)

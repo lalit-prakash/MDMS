@@ -15,5 +15,11 @@ public class HierarchyNodeConfiguration : IEntityTypeConfiguration<HierarchyNode
         builder.Property(n => n.Name).IsRequired().HasMaxLength(256);
         builder.HasOne(n => n.Parent).WithMany().HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(n => new { n.TenantId, n.NodeType, n.Code }).IsUnique();
+        builder.Property(n => n.CapacityKva).HasColumnType("numeric(18,4)");
+        builder.Property(n => n.VoltageLevel).HasMaxLength(32);
+        builder.Property(n => n.Make).HasMaxLength(128);
+        builder.Property(n => n.OperationalStatus).HasMaxLength(32);
+        builder.Property(n => n.Latitude).HasColumnType("numeric(9,6)");
+        builder.Property(n => n.Longitude).HasColumnType("numeric(9,6)");
     }
 }
