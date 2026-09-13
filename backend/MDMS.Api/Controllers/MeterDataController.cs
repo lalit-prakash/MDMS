@@ -1,5 +1,7 @@
+using MDMS.Api.Reporting;
 using MDMS.Application.Common;
 using MDMS.Application.MeterData;
+using MDMS.Application.Reporting;
 using MDMS.Domain.Entities;
 using MDMS.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +13,15 @@ namespace MDMS.Api.Controllers;
 /// Measurement ingestion and retrieval — every category this project's meter-data spec defines:
 /// Load Survey (LS, 30-min interval energy), Daily Load Profile (DLP/DP, daily energy),
 /// Instantaneous Profile (IP, 15-min point-in-time electrical state), Billing Profile (BP, monthly
-/// commercial snapshot), and meter Events/Alarms — plus data-quality holds.
+/// commercial snapshot), meter Events, meter Alarms, and data-quality holds.
+///
+/// Every list endpoint here follows the same shape: max 100 rows/page (ReportPaging), an optional
+/// from/to date range on the record's own timestamp, an optional meterId filter, and
+/// <c>?export=csv</c> to download every matching row (not just the current page) as CSV — the
+/// same pattern ReportsController uses, applied to raw meter data rather than business reports.
+/// Events and Alarms are deliberately separate endpoints, even though both read the same
+/// MeterEvent table filtered by severity (Alarm = Warning/Critical, Event = Info) — matching how
+/// this project's own reference UI treats them as two distinct screens, not a shared one.
 /// </summary>
 [ApiController]
 [Route("api/v1/meter-data")]
@@ -31,6 +41,10 @@ public class MeterDataController : ControllerBase
         _dlpIngestionService = dlpIngestionService;
     }
 
+    private static (int page, int pageSize) Page(int? page, int? pageSize) => ReportPaging.Normalize(page, pageSize);
+
+    // --------------------------------------------------------------------------- Load Survey (LS)
+
     [HttpPost("ls")]
     public async Task<IActionResult> IngestLoadSurvey(
         [FromBody] IReadOnlyList<LoadSurveyIngestRequest> requests, CancellationToken ct)
@@ -43,19 +57,34 @@ public class MeterDataController : ControllerBase
     }
 
     [HttpGet("ls")]
-    public async Task<IActionResult> ListLoadSurvey([FromQuery] Guid? meterId, CancellationToken ct)
+    public async Task<IActionResult> ListLoadSurvey(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
+        var (p, size) = Page(page, pageSize);
+
         var query = _db.LoadSurveyIntervals.AsQueryable();
-        if (meterId.HasValue)
-            query = query.Where(i => i.MeterId == meterId.Value);
+        if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(i => i.IntervalStartUtc >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(i => i.IntervalStartUtc <= toDate.Value);
+        query = query.OrderByDescending(i => i.IntervalEndUtc);
 
-        var intervals = await query
-            .OrderByDescending(i => i.IntervalEndUtc)
-            .Take(500)
-            .ToListAsync(ct);
+        var total = await query.CountAsync(ct);
 
-        return Ok(intervals);
+        if (export == "csv")
+        {
+            var all = await query.ToListAsync(ct);
+            var csv = CsvWriter.Write(
+                ["Meter Id", "Interval Start (UTC)", "Interval End (UTC)", "Cumulative Reading", "Consumption (kWh)", "Quality", "Source"],
+                all, i => [i.MeterId.ToString(), i.IntervalStartUtc, i.IntervalEndUtc, i.CumulativeReading, i.ConsumptionKwh, i.Quality.ToString(), i.Source.ToString()]);
+            return File(csv, "text/csv", $"MDMS_LoadSurvey_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        }
+
+        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        return Ok(new ListResult<LoadSurveyInterval>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
+
+    // ------------------------------------------------------------------------- Daily Profile (DP)
 
     [HttpPost("dlp")]
     public async Task<IActionResult> IngestDailyLoadProfile(
@@ -74,18 +103,31 @@ public class MeterDataController : ControllerBase
     }
 
     [HttpGet("dlp")]
-    public async Task<IActionResult> ListDailyLoadProfiles([FromQuery] Guid? meterId, CancellationToken ct)
+    public async Task<IActionResult> ListDailyLoadProfiles(
+        [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
+        var (p, size) = Page(page, pageSize);
+
         var query = _db.DailyLoadProfiles.AsQueryable();
-        if (meterId.HasValue)
-            query = query.Where(p => p.MeterId == meterId.Value);
+        if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(i => i.ProfileDate >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(i => i.ProfileDate <= toDate.Value);
+        query = query.OrderByDescending(i => i.ProfileDate);
 
-        var profiles = await query
-            .OrderByDescending(p => p.ProfileDate)
-            .Take(500)
-            .ToListAsync(ct);
+        var total = await query.CountAsync(ct);
 
-        return Ok(profiles);
+        if (export == "csv")
+        {
+            var all = await query.ToListAsync(ct);
+            var csv = CsvWriter.Write(
+                ["Meter Id", "Profile Date", "kWh Import", "kVAh Import", "kWh Export", "kVAh Export", "Quality", "Source"],
+                all, i => [i.MeterId.ToString(), i.ProfileDate.ToString("yyyy-MM-dd"), i.ConsumptionKwh, i.KvahImport, i.KwhExport, i.KvahExport, i.Quality.ToString(), i.Source.ToString()]);
+            return File(csv, "text/csv", $"MDMS_DailyProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        }
+
+        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        return Ok(new ListResult<DailyLoadProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // ------------------------------------------------------------------ Instantaneous Profile (IP)
@@ -137,14 +179,38 @@ public class MeterDataController : ControllerBase
     }
 
     [HttpGet("ip")]
-    public async Task<IActionResult> ListInstantaneousProfiles([FromQuery] Guid? meterId, CancellationToken ct)
+    public async Task<IActionResult> ListInstantaneousProfiles(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
-        var query = _db.InstantaneousProfiles.AsQueryable();
-        if (meterId.HasValue)
-            query = query.Where(p => p.MeterId == meterId.Value);
+        var (p, size) = Page(page, pageSize);
 
-        var profiles = await query.OrderByDescending(p => p.MeterTimeUtc).Take(500).ToListAsync(ct);
-        return Ok(profiles);
+        var query = _db.InstantaneousProfiles.AsQueryable();
+        if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(i => i.MeterTimeUtc >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(i => i.MeterTimeUtc <= toDate.Value);
+        query = query.OrderByDescending(i => i.MeterTimeUtc);
+
+        var total = await query.CountAsync(ct);
+
+        if (export == "csv")
+        {
+            var all = await query.ToListAsync(ct);
+            var csv = CsvWriter.Write(
+                ["Meter Id", "Meter Time (UTC)", "Voltage", "Phase Current", "Neutral Current", "Power Factor", "Frequency",
+                 "kW", "kVA", "kWh", "kVAh", "kWh Export", "kVAh Export",
+                 "MD kW", "MD kW At", "MD kVA", "MD kVA At", "MD kW Export", "MD kW Export At", "MD kVA Export", "MD kVA Export At",
+                 "Power On Duration (min)", "Tamper Count", "Billing Count", "Programming Count", "Load Limit State", "Load Limit Value"],
+                all, i => [
+                    i.MeterId.ToString(), i.MeterTimeUtc, i.Voltage, i.PhaseCurrent, i.NeutralCurrent, i.PowerFactor, i.Frequency,
+                    i.Kw, i.Kva, i.Kwh, i.Kvah, i.KwhExport, i.KvahExport,
+                    i.MdKw, i.MdKwAtUtc, i.MdKva, i.MdKvaAtUtc, i.MdKwExport, i.MdKwExportAtUtc, i.MdKvaExport, i.MdKvaExportAtUtc,
+                    i.PowerOnDurationMinutes, i.TamperCount, i.BillingCount, i.ProgrammingCount, i.LoadLimitState.ToString(), i.LoadLimitValue]);
+            return File(csv, "text/csv", $"MDMS_InstantaneousProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        }
+
+        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        return Ok(new ListResult<InstantaneousProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
     // ------------------------------------------------------------------------ Billing Profile (BP)
@@ -182,20 +248,60 @@ public class MeterDataController : ControllerBase
     }
 
     [HttpGet("bp")]
-    public async Task<IActionResult> ListBillingProfiles([FromQuery] Guid? meterId, CancellationToken ct)
+    public async Task<IActionResult> ListBillingProfiles(
+        [FromQuery] Guid? meterId, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
     {
-        var query = _db.BillingProfiles.AsQueryable();
-        if (meterId.HasValue)
-            query = query.Where(p => p.MeterId == meterId.Value);
+        var (p, size) = Page(page, pageSize);
 
-        var profiles = await query.OrderByDescending(p => p.BillingDate).Take(100).ToListAsync(ct);
-        return Ok(profiles);
+        var query = _db.BillingProfiles.AsQueryable();
+        if (meterId.HasValue) query = query.Where(i => i.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(i => i.BillingDate >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(i => i.BillingDate <= toDate.Value);
+        query = query.OrderByDescending(i => i.BillingDate);
+
+        var total = await query.CountAsync(ct);
+
+        if (export == "csv")
+        {
+            var all = await query.ToListAsync(ct);
+            var headers = new List<string>
+            {
+                "Meter Id", "Billing Date",
+                "Cumulative Energy kWh Import (Monthly)", "Cumulative Energy kVAh Import (Monthly)",
+                "Cumulative Energy kWh Export (Monthly)", "Cumulative Energy kVAh Export (Monthly)",
+                "Average Power Factor",
+            };
+            headers.AddRange(Enumerable.Range(1, 8).Select(z => $"kWh TZ{z}"));
+            headers.AddRange(Enumerable.Range(1, 8).Select(z => $"kVAh TZ{z}"));
+            headers.AddRange(["Max Demand kW", "Max Demand kVA", "Billing Power On Duration (min)"]);
+
+            var csv = CsvWriter.Write(headers, all, i =>
+            {
+                var row = new List<object?>
+                {
+                    i.MeterId.ToString(), i.BillingDate.ToString("yyyy-MM-dd"),
+                    i.CumulativeKwhImport, i.CumulativeKvahImport, i.CumulativeKwhExport, i.CumulativeKvahExport,
+                    i.AveragePowerFactor,
+                };
+                row.AddRange(i.KwhByTariffZone.Cast<object?>());
+                row.AddRange(i.KvahByTariffZone.Cast<object?>());
+                row.AddRange([i.MaximumDemandKw, i.MaximumDemandKva, i.BillingPowerOnDurationMinutes]);
+                return row;
+            });
+            return File(csv, "text/csv", $"MDMS_BillingProfile_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        }
+
+        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        return Ok(new ListResult<BillingProfile>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
-    // ------------------------------------------------------------------------- Events / Alarms
+    // --------------------------------------------------------------------------------- Events
 
     public record IngestMeterEventRequest(Guid MeterId, DateTime OccurredAtUtc, MeterEventType EventType, MeterEventSeverity Severity, string? Description);
 
+    /// <summary>Shared ingest for both Events and Alarms — which bucket a row lands in is
+    /// determined entirely by its own Severity, not by which endpoint ingested it.</summary>
     [HttpPost("events")]
     public async Task<IActionResult> IngestMeterEvents([FromBody] IReadOnlyList<IngestMeterEventRequest> requests, CancellationToken ct)
     {
@@ -208,18 +314,52 @@ public class MeterDataController : ControllerBase
         return Ok(events.Select(e => new { e.Id, e.MeterId, e.OccurredAtUtc, e.EventType, e.Severity }));
     }
 
-    [HttpGet("events")]
-    public async Task<IActionResult> ListMeterEvents(
-        [FromQuery] Guid? meterId, [FromQuery] MeterEventSeverity? severity, [FromQuery] bool? acknowledged, CancellationToken ct)
+    private async Task<IActionResult> ListMeterEventsBySeverity(
+        MeterEventSeverity[] severities, string filenamePrefix,
+        Guid? meterId, DateTime? fromDate, DateTime? toDate, bool? acknowledged,
+        int? page, int? pageSize, string? export, CancellationToken ct)
     {
-        var query = _db.MeterEvents.AsQueryable();
-        if (meterId.HasValue) query = query.Where(e => e.MeterId == meterId.Value);
-        if (severity.HasValue) query = query.Where(e => e.Severity == severity.Value);
-        if (acknowledged.HasValue) query = query.Where(e => e.IsAcknowledged == acknowledged.Value);
+        var (p, size) = Page(page, pageSize);
 
-        var events = await query.OrderByDescending(e => e.OccurredAtUtc).Take(500).ToListAsync(ct);
-        return Ok(events);
+        var query = _db.MeterEvents.Where(e => severities.Contains(e.Severity));
+        if (meterId.HasValue) query = query.Where(e => e.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(e => e.OccurredAtUtc >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(e => e.OccurredAtUtc <= toDate.Value);
+        if (acknowledged.HasValue) query = query.Where(e => e.IsAcknowledged == acknowledged.Value);
+        query = query.OrderByDescending(e => e.OccurredAtUtc);
+
+        var total = await query.CountAsync(ct);
+
+        if (export == "csv")
+        {
+            var all = await query.ToListAsync(ct);
+            var csv = CsvWriter.Write(
+                ["Meter Id", "Occurred (UTC)", "Type", "Severity", "Description", "Acknowledged", "Acknowledged At (UTC)"],
+                all, e => [e.MeterId.ToString(), e.OccurredAtUtc, e.EventType.ToString(), e.Severity.ToString(), e.Description, e.IsAcknowledged, e.AcknowledgedAtUtc]);
+            return File(csv, "text/csv", $"MDMS_{filenamePrefix}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+        }
+
+        var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
+        return Ok(new ListResult<MeterEvent>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
+
+    /// <summary>Info-severity rows only — a "real event", not an alarm condition. See
+    /// <see cref="ListAlarms"/> for the Warning/Critical counterpart.</summary>
+    [HttpGet("events")]
+    public Task<IActionResult> ListEvents(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
+        => ListMeterEventsBySeverity([MeterEventSeverity.Info], "Events", meterId, fromDate, toDate, acknowledged, page, pageSize, export, ct);
+
+    // --------------------------------------------------------------------------------- Alarms
+
+    /// <summary>Warning/Critical-severity rows only. A separate screen from Events per this
+    /// project's own reference UI, even though both read the same underlying table.</summary>
+    [HttpGet("alarms")]
+    public Task<IActionResult> ListAlarms(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged,
+        [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
+        => ListMeterEventsBySeverity([MeterEventSeverity.Warning, MeterEventSeverity.Critical], "Alarms", meterId, fromDate, toDate, acknowledged, page, pageSize, export, ct);
 
     [HttpPost("events/{id:guid}/acknowledge")]
     public async Task<IActionResult> AcknowledgeMeterEvent(Guid id, CancellationToken ct)

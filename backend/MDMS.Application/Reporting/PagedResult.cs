@@ -10,6 +10,10 @@ public record PaginationInfo(int Page, int PageSize, int TotalRecords, int Total
 
 public record ReportResult<TRow, TSummary>(IReadOnlyList<TRow> Data, PaginationInfo Pagination, TSummary Summary, DateTime GeneratedAtUtc);
 
+/// <summary>Same shape as <see cref="ReportResult{TRow,TSummary}"/> minus a summary — for plain
+/// paginated listings (meter-data categories) that don't need business KPIs alongside the rows.</summary>
+public record ListResult<TRow>(IReadOnlyList<TRow> Data, PaginationInfo Pagination, DateTime GeneratedAtUtc);
+
 public static class ReportPaging
 {
     /// <summary>Max 100 records per screen — non-negotiable per the reporting spec (rule #1).</summary>
