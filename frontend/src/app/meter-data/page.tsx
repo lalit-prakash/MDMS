@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
@@ -11,18 +10,19 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  TextField,
   Stack,
   Button,
   Switch,
   FormControlLabel,
-  Alert,
   Tabs,
   Tab,
 } from "@mui/material";
+import { useState } from "react";
 import { apiClient } from "@/lib/apiClient";
 import { LoadSurveyInterval, DailyLoadProfile, DataQualityHold } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ReportColumn } from "@/components/reports/ReportTable";
+import { MeterDataListTab } from "@/components/reports/MeterDataListTab";
 
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import { PageHeader } from "@/components/PageHeader";
@@ -49,9 +49,14 @@ interface BillingProfile {
   billingDate: string;
   cumulativeKwhImport: number;
   cumulativeKvahImport: number;
+  cumulativeKwhExport: number;
+  cumulativeKvahExport: number;
   averagePowerFactor: number;
+  kwhByTariffZone: number[];
+  kvahByTariffZone: number[];
   maximumDemandKw: number;
   maximumDemandKva: number;
+  billingPowerOnDurationMinutes: number;
 }
 
 interface MeterEvent {
@@ -64,57 +69,105 @@ interface MeterEvent {
   isAcknowledged: boolean;
 }
 
-type DataTab = "ls" | "dlp" | "ip" | "bp" | "events" | "holds";
+type DataTab = "ls" | "dlp" | "ip" | "bp" | "events" | "alarms" | "holds";
 
 const TABS: { value: DataTab; label: string }[] = [
   { value: "ls", label: "Load Survey (LS)" },
   { value: "dlp", label: "Daily Profile (DP)" },
   { value: "ip", label: "Instantaneous Profile (IP)" },
   { value: "bp", label: "Billing Profile (BP)" },
-  { value: "events", label: "Events & Alarms" },
+  { value: "events", label: "Events" },
+  { value: "alarms", label: "Alarms" },
   { value: "holds", label: "Data-Quality Holds" },
 ];
+
+const lsColumns: ReportColumn<LoadSurveyInterval>[] = [
+  { key: "start", label: "Interval Start", render: (r) => new Date(r.intervalStartUtc).toLocaleString() },
+  { key: "end", label: "Interval End", render: (r) => new Date(r.intervalEndUtc).toLocaleString() },
+  { key: "cumulative", label: "Cumulative", align: "right", render: (r) => r.cumulativeReading },
+  { key: "consumption", label: "Consumption (kWh)", align: "right", render: (r) => r.consumptionKwh },
+  { key: "quality", label: "Quality", render: (r) => <StatusBadge value={r.quality} /> },
+  { key: "source", label: "Source", render: (r) => <StatusBadge value={r.source} /> },
+];
+
+const dlpColumns: ReportColumn<DailyLoadProfile>[] = [
+  { key: "date", label: "Profile Date", render: (r) => r.profileDate },
+  { key: "kwhImport", label: "kWh Import", align: "right", render: (r) => r.consumptionKwh },
+  { key: "kvahImport", label: "kVAh Import", align: "right", render: (r) => r.kvahImport ?? "—" },
+  { key: "kwhExport", label: "kWh Export", align: "right", render: (r) => r.kwhExport ?? "—" },
+  { key: "kvahExport", label: "kVAh Export", align: "right", render: (r) => r.kvahExport ?? "—" },
+  { key: "quality", label: "Quality", render: (r) => <StatusBadge value={r.quality} /> },
+  { key: "source", label: "Source", render: (r) => <StatusBadge value={r.source} /> },
+];
+
+const ipColumns: ReportColumn<InstantaneousProfile>[] = [
+  { key: "time", label: "Meter Time", render: (r) => new Date(r.meterTimeUtc).toLocaleString() },
+  { key: "voltage", label: "Voltage", align: "right", render: (r) => r.voltage },
+  { key: "current", label: "Current", align: "right", render: (r) => r.phaseCurrent },
+  { key: "pf", label: "PF", align: "right", render: (r) => r.powerFactor },
+  { key: "freq", label: "Freq", align: "right", render: (r) => r.frequency },
+  { key: "kw", label: "kW", align: "right", render: (r) => r.kw },
+  { key: "kva", label: "kVA", align: "right", render: (r) => r.kva },
+  { key: "kwh", label: "kWh", align: "right", render: (r) => r.kwh },
+  { key: "kvah", label: "kVAh", align: "right", render: (r) => r.kvah },
+  { key: "limit", label: "Load Limit", render: (r) => <StatusBadge value={r.loadLimitState} /> },
+  { key: "tamper", label: "Tamper", align: "right", render: (r) => r.tamperCount },
+];
+
+const tzHeader = (prefix: "kWh" | "kVAh", zone: number): ReportColumn<BillingProfile> => ({
+  key: `${prefix}Tz${zone}`,
+  label: `${prefix} TZ${zone}`,
+  align: "right",
+  render: (r) => (prefix === "kWh" ? r.kwhByTariffZone : r.kvahByTariffZone)[zone - 1] ?? "—",
+});
+
+const bpColumns: ReportColumn<BillingProfile>[] = [
+  { key: "date", label: "Billing Date", render: (r) => r.billingDate },
+  { key: "cumKwhImport", label: "Cum. kWh Import", align: "right", render: (r) => r.cumulativeKwhImport },
+  { key: "cumKvahImport", label: "Cum. kVAh Import", align: "right", render: (r) => r.cumulativeKvahImport },
+  { key: "cumKwhExport", label: "Cum. kWh Export", align: "right", render: (r) => r.cumulativeKwhExport },
+  { key: "cumKvahExport", label: "Cum. kVAh Export", align: "right", render: (r) => r.cumulativeKvahExport },
+  { key: "avgPf", label: "Avg. PF", align: "right", render: (r) => r.averagePowerFactor },
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map((z) => tzHeader("kWh", z)),
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map((z) => tzHeader("kVAh", z)),
+  { key: "mdKw", label: "Max Demand kW", align: "right", render: (r) => r.maximumDemandKw },
+  { key: "mdKva", label: "Max Demand kVA", align: "right", render: (r) => r.maximumDemandKva },
+  { key: "powerOn", label: "Power On Duration (min)", align: "right", render: (r) => r.billingPowerOnDurationMinutes },
+];
+
+function useAcknowledge(queryKeyPrefix: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => apiClient.post(`/api/v1/meter-data/events/${eventId}/acknowledge`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["report", queryKeyPrefix] }),
+  });
+}
+
+function eventColumns(acknowledge: ReturnType<typeof useAcknowledge>): ReportColumn<MeterEvent>[] {
+  return [
+    { key: "occurred", label: "Occurred", render: (r) => new Date(r.occurredAtUtc).toLocaleString() },
+    { key: "type", label: "Type", render: (r) => r.eventType },
+    { key: "severity", label: "Severity", render: (r) => <StatusBadge value={r.severity} /> },
+    { key: "description", label: "Description", render: (r) => r.description ?? "—" },
+    { key: "status", label: "Status", render: (r) => <StatusBadge value={r.isAcknowledged ? "Acknowledged" : "Open"} /> },
+    {
+      key: "action",
+      label: "Action",
+      align: "right",
+      render: (r) =>
+        !r.isAcknowledged && (
+          <Button size="small" onClick={() => acknowledge.mutate(r.id)}>
+            Acknowledge
+          </Button>
+        ),
+    },
+  ];
+}
 
 export default function MeterDataPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<DataTab>("ls");
-  const [meterId, setMeterId] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
-
-  const lsQuery = useQuery({
-    queryKey: ["ls-intervals", meterId],
-    queryFn: () => apiClient.get<LoadSurveyInterval[]>(`/api/v1/meter-data/ls${meterId ? `?meterId=${meterId}` : ""}`),
-    enabled: tab === "ls",
-  });
-
-  const dlpQuery = useQuery({
-    queryKey: ["dlp", meterId],
-    queryFn: () => apiClient.get<DailyLoadProfile[]>(`/api/v1/meter-data/dlp${meterId ? `?meterId=${meterId}` : ""}`),
-    enabled: tab === "dlp",
-  });
-
-  const ipQuery = useQuery({
-    queryKey: ["ip", meterId],
-    queryFn: () => apiClient.get<InstantaneousProfile[]>(`/api/v1/meter-data/ip${meterId ? `?meterId=${meterId}` : ""}`),
-    enabled: tab === "ip",
-  });
-
-  const bpQuery = useQuery({
-    queryKey: ["bp", meterId],
-    queryFn: () => apiClient.get<BillingProfile[]>(`/api/v1/meter-data/bp${meterId ? `?meterId=${meterId}` : ""}`),
-    enabled: tab === "bp",
-  });
-
-  const eventsQuery = useQuery({
-    queryKey: ["meter-events", meterId],
-    queryFn: () => apiClient.get<MeterEvent[]>(`/api/v1/meter-data/events${meterId ? `?meterId=${meterId}` : ""}`),
-    enabled: tab === "events",
-  });
-
-  const acknowledgeEvent = useMutation({
-    mutationFn: (eventId: string) => apiClient.post(`/api/v1/meter-data/events/${eventId}/acknowledge`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["meter-events"] }),
-  });
 
   const holdsQuery = useQuery({
     queryKey: ["billing-holds", activeOnly],
@@ -130,223 +183,78 @@ export default function MeterDataPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-holds"] }),
   });
 
+  const acknowledgeEvents = useAcknowledge("/api/v1/meter-data/events");
+  const acknowledgeAlarms = useAcknowledge("/api/v1/meter-data/alarms");
+
   return (
     <Box>
       <PageHeader icon={<StorageOutlinedIcon fontSize="small" />} title="Meter Data" />
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Every category of meter-reported data this system records: 30-minute Load Survey, Daily
-        Profile, 15-minute Instantaneous Profile, monthly Billing Profile, and Events/Alarms.
+        Profile, 15-minute Instantaneous Profile, monthly Billing Profile, and Events and Alarms as
+        separate screens. Every list is server-paginated (100 rows/page max) with a Download All CSV.
       </Typography>
 
-      <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 3, borderBottom: "1px solid var(--color-border-default)" }}>
+      <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 3, borderBottom: "1px solid var(--color-border-default)" }} variant="scrollable">
         {TABS.map((t) => (
           <Tab key={t.value} value={t.value} label={t.label} sx={{ textTransform: "none", fontSize: 13 }} />
         ))}
       </Tabs>
 
-      {tab !== "holds" && (
-        <TextField
-          label="Filter by Meter ID (optional)"
-          size="small"
-          value={meterId}
-          onChange={(e) => setMeterId(e.target.value)}
-          sx={{ mb: 3, width: 380 }}
+      {tab === "ls" && (
+        <MeterDataListTab<LoadSurveyInterval>
+          endpoint="/api/v1/meter-data/ls"
+          filenamePrefix="MDMS_LoadSurvey"
+          columns={lsColumns}
+          rowKey={(r) => r.id}
         />
       )}
 
-      {tab === "ls" && (
-        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Interval start</TableCell>
-                <TableCell>Interval end</TableCell>
-                <TableCell align="right">Cumulative</TableCell>
-                <TableCell align="right">Consumption (kWh)</TableCell>
-                <TableCell>Quality</TableCell>
-                <TableCell>Source</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {lsQuery.isError && (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <Alert severity="warning">Could not load LS intervals.</Alert>
-                  </TableCell>
-                </TableRow>
-              )}
-              {lsQuery.data?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6}>No intervals found.</TableCell>
-                </TableRow>
-              )}
-              {lsQuery.data?.map((i) => (
-                <TableRow key={i.id} hover>
-                  <TableCell>{new Date(i.intervalStartUtc).toLocaleString()}</TableCell>
-                  <TableCell>{new Date(i.intervalEndUtc).toLocaleString()}</TableCell>
-                  <TableCell align="right">{i.cumulativeReading}</TableCell>
-                  <TableCell align="right">{i.consumptionKwh}</TableCell>
-                  <TableCell><StatusBadge value={i.quality} /></TableCell>
-                  <TableCell><StatusBadge value={i.source} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
-      )}
-
       {tab === "dlp" && (
-        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Profile date</TableCell>
-                <TableCell align="right">kWh Import</TableCell>
-                <TableCell align="right">kVAh Import</TableCell>
-                <TableCell align="right">kWh Export</TableCell>
-                <TableCell align="right">kVAh Export</TableCell>
-                <TableCell>Quality</TableCell>
-                <TableCell>Source</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {dlpQuery.data?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7}>No profiles found.</TableCell>
-                </TableRow>
-              )}
-              {dlpQuery.data?.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell>{p.profileDate}</TableCell>
-                  <TableCell align="right">{p.consumptionKwh}</TableCell>
-                  <TableCell align="right">{p.kvahImport ?? "—"}</TableCell>
-                  <TableCell align="right">{p.kwhExport ?? "—"}</TableCell>
-                  <TableCell align="right">{p.kvahExport ?? "—"}</TableCell>
-                  <TableCell><StatusBadge value={p.quality} /></TableCell>
-                  <TableCell><StatusBadge value={p.source} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <MeterDataListTab<DailyLoadProfile>
+          endpoint="/api/v1/meter-data/dlp"
+          filenamePrefix="MDMS_DailyProfile"
+          columns={dlpColumns}
+          rowKey={(r) => r.id}
+          dateFieldType="date"
+        />
       )}
 
       {tab === "ip" && (
-        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Meter Time</TableCell>
-                <TableCell align="right">Voltage</TableCell>
-                <TableCell align="right">Current</TableCell>
-                <TableCell align="right">PF</TableCell>
-                <TableCell align="right">Freq</TableCell>
-                <TableCell align="right">kW</TableCell>
-                <TableCell align="right">kVA</TableCell>
-                <TableCell align="right">kWh</TableCell>
-                <TableCell align="right">kVAh</TableCell>
-                <TableCell>Load Limit</TableCell>
-                <TableCell align="right">Tamper</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {ipQuery.data?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={11}>No Instantaneous Profile readings found.</TableCell>
-                </TableRow>
-              )}
-              {ipQuery.data?.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell>{new Date(p.meterTimeUtc).toLocaleString()}</TableCell>
-                  <TableCell align="right">{p.voltage}</TableCell>
-                  <TableCell align="right">{p.phaseCurrent}</TableCell>
-                  <TableCell align="right">{p.powerFactor}</TableCell>
-                  <TableCell align="right">{p.frequency}</TableCell>
-                  <TableCell align="right">{p.kw}</TableCell>
-                  <TableCell align="right">{p.kva}</TableCell>
-                  <TableCell align="right">{p.kwh}</TableCell>
-                  <TableCell align="right">{p.kvah}</TableCell>
-                  <TableCell><StatusBadge value={p.loadLimitState} /></TableCell>
-                  <TableCell align="right">{p.tamperCount}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <MeterDataListTab<InstantaneousProfile>
+          endpoint="/api/v1/meter-data/ip"
+          filenamePrefix="MDMS_InstantaneousProfile"
+          columns={ipColumns}
+          rowKey={(r) => r.id}
+        />
       )}
 
       {tab === "bp" && (
-        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Billing Date</TableCell>
-                <TableCell align="right">Cumulative kWh Import</TableCell>
-                <TableCell align="right">Cumulative kVAh Import</TableCell>
-                <TableCell align="right">Avg. PF</TableCell>
-                <TableCell align="right">MD kW</TableCell>
-                <TableCell align="right">MD kVA</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {bpQuery.data?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6}>No Billing Profiles found.</TableCell>
-                </TableRow>
-              )}
-              {bpQuery.data?.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell>{p.billingDate}</TableCell>
-                  <TableCell align="right">{p.cumulativeKwhImport}</TableCell>
-                  <TableCell align="right">{p.cumulativeKvahImport}</TableCell>
-                  <TableCell align="right">{p.averagePowerFactor}</TableCell>
-                  <TableCell align="right">{p.maximumDemandKw}</TableCell>
-                  <TableCell align="right">{p.maximumDemandKva}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <MeterDataListTab<BillingProfile>
+          endpoint="/api/v1/meter-data/bp"
+          filenamePrefix="MDMS_BillingProfile"
+          columns={bpColumns}
+          rowKey={(r) => r.id}
+          dateFieldType="date"
+        />
       )}
 
       {tab === "events" && (
-        <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Occurred</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Severity</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {eventsQuery.data?.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6}>No events or alarms found.</TableCell>
-                </TableRow>
-              )}
-              {eventsQuery.data?.map((e) => (
-                <TableRow key={e.id} hover>
-                  <TableCell>{new Date(e.occurredAtUtc).toLocaleString()}</TableCell>
-                  <TableCell>{e.eventType}</TableCell>
-                  <TableCell><StatusBadge value={e.severity} /></TableCell>
-                  <TableCell>{e.description ?? "—"}</TableCell>
-                  <TableCell><StatusBadge value={e.isAcknowledged ? "Acknowledged" : "Open"} /></TableCell>
-                  <TableCell align="right">
-                    {!e.isAcknowledged && (
-                      <Button size="small" onClick={() => acknowledgeEvent.mutate(e.id)}>
-                        Acknowledge
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <MeterDataListTab<MeterEvent>
+          endpoint="/api/v1/meter-data/events"
+          filenamePrefix="MDMS_Events"
+          columns={eventColumns(acknowledgeEvents)}
+          rowKey={(r) => r.id}
+        />
+      )}
+
+      {tab === "alarms" && (
+        <MeterDataListTab<MeterEvent>
+          endpoint="/api/v1/meter-data/alarms"
+          filenamePrefix="MDMS_Alarms"
+          columns={eventColumns(acknowledgeAlarms)}
+          rowKey={(r) => r.id}
+        />
       )}
 
       {tab === "holds" && (
