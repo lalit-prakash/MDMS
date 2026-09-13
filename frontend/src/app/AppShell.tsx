@@ -40,6 +40,9 @@ import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import { useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { useAuth } from "@/lib/session/AuthContext";
@@ -61,10 +64,16 @@ interface ModuleGroup {
   items: ModuleLink[];
 }
 
-// Grouping and icons mirror the approved design mockup. Only modules that actually exist in this
-// frontend are listed — no "Consumers" / "Energy Analytics" placeholders for pages that aren't built.
+// Grouping and icons mirror the approved design mockup — every entry here now has a real page
+// behind it (Consumers, Energy Analytics, Reports, Settings, Help & Support included).
 const GROUPS: ModuleGroup[] = [
-  { label: "Overview", items: [{ label: "Home", href: "/", icon: SpaceDashboardOutlinedIcon }] },
+  {
+    label: "Overview",
+    items: [
+      { label: "Home", href: "/", icon: SpaceDashboardOutlinedIcon },
+      { label: "Reports", href: "/reports", icon: AssessmentOutlinedIcon },
+    ],
+  },
   {
     label: "Operations",
     items: [
@@ -76,6 +85,7 @@ const GROUPS: ModuleGroup[] = [
   {
     label: "Analytics",
     items: [
+      { label: "Energy Analytics", href: "/energy-analytics", icon: InsightsOutlinedIcon },
       { label: "Energy Audit", href: "/energy-audit", icon: InsightsOutlinedIcon },
       { label: "Revenue Protection", href: "/revenue-protection", icon: ShieldOutlinedIcon },
     ],
@@ -83,6 +93,7 @@ const GROUPS: ModuleGroup[] = [
   {
     label: "Customer",
     items: [
+      { label: "Consumers", href: "/consumers", icon: GroupsOutlinedIcon },
       { label: "Complaints", href: "/complaints", icon: SupportAgentOutlinedIcon },
       { label: "Prepaid", href: "/prepaid", icon: AccountBalanceWalletOutlinedIcon },
     ],
@@ -92,6 +103,8 @@ const GROUPS: ModuleGroup[] = [
     items: [
       { label: "Configuration", href: "/config", icon: TuneOutlinedIcon },
       { label: "Users & Access", href: "/users", icon: GroupOutlinedIcon },
+      { label: "Settings", href: "/settings", icon: TuneOutlinedIcon },
+      { label: "Help & Support", href: "/help", icon: HelpOutlineOutlinedIcon },
     ],
   },
 ];
