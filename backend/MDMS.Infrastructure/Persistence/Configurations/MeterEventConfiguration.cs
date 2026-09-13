@@ -13,6 +13,8 @@ public class MeterEventConfiguration : IEntityTypeConfiguration<MeterEvent>
         builder.Property(e => e.EventType).HasConversion<int>();
         builder.Property(e => e.Severity).HasConversion<int>();
         builder.Property(e => e.Description).HasMaxLength(500);
+        foreach (var name in new[] { nameof(MeterEvent.OccCurrent), nameof(MeterEvent.OccVoltage), nameof(MeterEvent.OccKwh), nameof(MeterEvent.OccTemperature) })
+            builder.Property(name).HasColumnType("numeric(18,4)");
         builder.HasIndex(e => e.MeterId);
         builder.HasIndex(e => e.OccurredAtUtc);
         builder.HasIndex(e => e.IsAcknowledged);

@@ -298,7 +298,9 @@ public class MeterDataController : ControllerBase
 
     // --------------------------------------------------------------------------------- Events
 
-    public record IngestMeterEventRequest(Guid MeterId, DateTime OccurredAtUtc, MeterEventType EventType, MeterEventSeverity Severity, string? Description);
+    public record IngestMeterEventRequest(
+        Guid MeterId, DateTime OccurredAtUtc, MeterEventType EventType, MeterEventSeverity Severity, string? Description,
+        decimal? OccCurrent = null, decimal? OccVoltage = null, decimal? OccKwh = null, decimal? OccTemperature = null);
 
     /// <summary>Shared ingest for both Events and Alarms — which bucket a row lands in is
     /// determined entirely by its own Severity, not by which endpoint ingested it.</summary>
@@ -308,15 +310,28 @@ public class MeterDataController : ControllerBase
         if (requests.Count == 0)
             return BadRequest("At least one event is required.");
 
-        var events = requests.Select(r => new MeterEvent(r.MeterId, r.OccurredAtUtc, r.EventType, r.Severity, r.Description)).ToList();
+        var events = requests.Select(r => new MeterEvent(
+            r.MeterId, r.OccurredAtUtc, r.EventType, r.Severity, r.Description,
+            r.OccCurrent, r.OccVoltage, r.OccKwh, r.OccTemperature)).ToList();
         _db.MeterEvents.AddRange(events);
         await _db.SaveChangesAsync(ct);
         return Ok(events.Select(e => new { e.Id, e.MeterId, e.OccurredAtUtc, e.EventType, e.Severity }));
     }
 
+    public record MeterEventRow(
+        Guid Id, Guid MeterId, DateTime OccurredAtUtc, string EventType, string Classification, string Severity, string? Description,
+        decimal? OccCurrent, decimal? OccVoltage, decimal? OccKwh, decimal? OccTemperature,
+        DateTime? ResolvedAtUtc, int? DurationMinutes, bool IsAcknowledged, DateTime? AcknowledgedAtUtc);
+
+    private static MeterEventRow ToRow(MeterEvent e) => new(
+        e.Id, e.MeterId, e.OccurredAtUtc, e.EventType.ToString(), MeterEventClassifier.Classify(e.EventType).ToString(), e.Severity.ToString(), e.Description,
+        e.OccCurrent, e.OccVoltage, e.OccKwh, e.OccTemperature,
+        e.ResolvedAtUtc, e.ResolvedAtUtc.HasValue ? (int)(e.ResolvedAtUtc.Value - e.OccurredAtUtc).TotalMinutes : null,
+        e.IsAcknowledged, e.AcknowledgedAtUtc);
+
     private async Task<IActionResult> ListMeterEventsBySeverity(
         MeterEventSeverity[] severities, string filenamePrefix,
-        Guid? meterId, DateTime? fromDate, DateTime? toDate, bool? acknowledged,
+        Guid? meterId, DateTime? fromDate, DateTime? toDate, bool? acknowledged, MeterEventType? eventType,
         int? page, int? pageSize, string? export, CancellationToken ct)
     {
         var (p, size) = Page(page, pageSize);
@@ -326,30 +341,70 @@ public class MeterDataController : ControllerBase
         if (fromDate.HasValue) query = query.Where(e => e.OccurredAtUtc >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(e => e.OccurredAtUtc <= toDate.Value);
         if (acknowledged.HasValue) query = query.Where(e => e.IsAcknowledged == acknowledged.Value);
+        if (eventType.HasValue) query = query.Where(e => e.EventType == eventType.Value);
         query = query.OrderByDescending(e => e.OccurredAtUtc);
 
         var total = await query.CountAsync(ct);
 
         if (export == "csv")
         {
-            var all = await query.ToListAsync(ct);
+            var all = (await query.ToListAsync(ct)).Select(ToRow).ToList();
             var csv = CsvWriter.Write(
-                ["Meter Id", "Occurred (UTC)", "Type", "Severity", "Description", "Acknowledged", "Acknowledged At (UTC)"],
-                all, e => [e.MeterId.ToString(), e.OccurredAtUtc, e.EventType.ToString(), e.Severity.ToString(), e.Description, e.IsAcknowledged, e.AcknowledgedAtUtc]);
+                ["Meter Id", "Occurred (UTC)", "Classification", "Type", "Severity", "Description",
+                 "Occ Current", "Occ Voltage", "Occ kWh", "Occ Temp", "Resolved (UTC)", "Duration (min)", "Acknowledged", "Acknowledged At (UTC)"],
+                all, e => [e.MeterId.ToString(), e.OccurredAtUtc, e.Classification, e.EventType, e.Severity, e.Description,
+                    e.OccCurrent, e.OccVoltage, e.OccKwh, e.OccTemperature, e.ResolvedAtUtc, e.DurationMinutes, e.IsAcknowledged, e.AcknowledgedAtUtc]);
             return File(csv, "text/csv", $"MDMS_{filenamePrefix}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
         var rows = await query.Skip((p - 1) * size).Take(size).ToListAsync(ct);
-        return Ok(new ListResult<MeterEvent>(rows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+        return Ok(new ListResult<MeterEventRow>(rows.Select(ToRow).ToList(), ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
+    }
+
+    /// <summary>One row per (Classification, EventType) with an aggregate count and last
+    /// occurrence — the summary view before drilling into individual occurrences. Same
+    /// severities/filters as the corresponding list endpoint.</summary>
+    private async Task<IActionResult> ClassificationSummary(
+        MeterEventSeverity[] severities, Guid? meterId, DateTime? fromDate, DateTime? toDate, CancellationToken ct)
+    {
+        var query = _db.MeterEvents.Where(e => severities.Contains(e.Severity));
+        if (meterId.HasValue) query = query.Where(e => e.MeterId == meterId.Value);
+        if (fromDate.HasValue) query = query.Where(e => e.OccurredAtUtc >= fromDate.Value);
+        if (toDate.HasValue) query = query.Where(e => e.OccurredAtUtc <= toDate.Value);
+
+        var all = await query.ToListAsync(ct);
+
+        var byType = all
+            .GroupBy(e => e.EventType)
+            .Select(g => new
+            {
+                Classification = MeterEventClassifier.Classify(g.Key).ToString(),
+                EventType = g.Key.ToString(),
+                Count = g.Count(),
+                LastOccurrenceUtc = g.Max(e => e.OccurredAtUtc),
+            })
+            .OrderByDescending(r => r.Count)
+            .ToList();
+
+        var byClassification = all
+            .GroupBy(e => MeterEventClassifier.Classify(e.EventType))
+            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+
+        return Ok(new { totalsByClassification = byClassification, summary = byType, generatedAtUtc = DateTime.UtcNow });
     }
 
     /// <summary>Info-severity rows only — a "real event", not an alarm condition. See
     /// <see cref="ListAlarms"/> for the Warning/Critical counterpart.</summary>
     [HttpGet("events")]
     public Task<IActionResult> ListEvents(
-        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged,
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged, [FromQuery] MeterEventType? eventType,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
-        => ListMeterEventsBySeverity([MeterEventSeverity.Info], "Events", meterId, fromDate, toDate, acknowledged, page, pageSize, export, ct);
+        => ListMeterEventsBySeverity([MeterEventSeverity.Info], "Events", meterId, fromDate, toDate, acknowledged, eventType, page, pageSize, export, ct);
+
+    [HttpGet("events/classification-summary")]
+    public Task<IActionResult> EventsClassificationSummary(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct)
+        => ClassificationSummary([MeterEventSeverity.Info], meterId, fromDate, toDate, ct);
 
     // --------------------------------------------------------------------------------- Alarms
 
@@ -357,9 +412,33 @@ public class MeterDataController : ControllerBase
     /// project's own reference UI, even though both read the same underlying table.</summary>
     [HttpGet("alarms")]
     public Task<IActionResult> ListAlarms(
-        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged,
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] bool? acknowledged, [FromQuery] MeterEventType? eventType,
         [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? export, CancellationToken ct)
-        => ListMeterEventsBySeverity([MeterEventSeverity.Warning, MeterEventSeverity.Critical], "Alarms", meterId, fromDate, toDate, acknowledged, page, pageSize, export, ct);
+        => ListMeterEventsBySeverity([MeterEventSeverity.Warning, MeterEventSeverity.Critical], "Alarms", meterId, fromDate, toDate, acknowledged, eventType, page, pageSize, export, ct);
+
+    [HttpGet("alarms/classification-summary")]
+    public Task<IActionResult> AlarmsClassificationSummary(
+        [FromQuery] Guid? meterId, [FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, CancellationToken ct)
+        => ClassificationSummary([MeterEventSeverity.Warning, MeterEventSeverity.Critical], meterId, fromDate, toDate, ct);
+
+    [HttpPost("events/{id:guid}/resolve")]
+    public async Task<IActionResult> ResolveMeterEvent(Guid id, CancellationToken ct)
+    {
+        var meterEvent = await _db.MeterEvents.FirstOrDefaultAsync(e => e.Id == id, ct);
+        if (meterEvent is null) return NotFound();
+
+        try
+        {
+            meterEvent.Resolve(DateTime.UtcNow);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(ToRow(meterEvent));
+    }
 
     [HttpPost("events/{id:guid}/acknowledge")]
     public async Task<IActionResult> AcknowledgeMeterEvent(Guid id, CancellationToken ct)
@@ -382,7 +461,7 @@ public class MeterDataController : ControllerBase
         }
 
         await _db.SaveChangesAsync(ct);
-        return Ok(meterEvent);
+        return Ok(ToRow(meterEvent));
     }
 
     [HttpGet("billing-holds")]

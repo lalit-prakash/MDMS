@@ -28,6 +28,7 @@ const EMPTY_FILTERS: AppliedFilters = { meterId: "", fromDate: "", toDate: "" };
 export function MeterDataListTab<TRow>({
   title,
   endpoint,
+  fixedParams,
   filenamePrefix,
   columns,
   rowKey,
@@ -36,6 +37,10 @@ export function MeterDataListTab<TRow>({
 }: {
   title: string;
   endpoint: string;
+  /** Query params baked into every request regardless of user filters (e.g. eventType when
+   * drilling into one event type) — merged in ahead of the user-editable filters below, so the
+   * URL is built once correctly instead of two callers each assuming they own the "?". */
+  fixedParams?: Record<string, string>;
   filenamePrefix: string;
   columns: ReportColumn<TRow>[];
   rowKey: (row: TRow) => string;
@@ -47,7 +52,7 @@ export function MeterDataListTab<TRow>({
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
 
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(fixedParams);
   if (applied.meterId) params.set("meterId", applied.meterId);
   if (applied.fromDate) params.set("fromDate", dateFieldType === "date" ? applied.fromDate : `${applied.fromDate}:00Z`);
   if (applied.toDate) params.set("toDate", dateFieldType === "date" ? applied.toDate : `${applied.toDate}:00Z`);

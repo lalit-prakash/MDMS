@@ -23,6 +23,7 @@ import { LoadSurveyInterval, DailyLoadProfile, DataQualityHold } from "@/lib/typ
 import { StatusBadge } from "@/components/StatusBadge";
 import { ReportColumn } from "@/components/reports/ReportTable";
 import { MeterDataListTab } from "@/components/reports/MeterDataListTab";
+import { EventClassificationView } from "@/components/reports/EventClassificationView";
 
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import { PageHeader } from "@/components/PageHeader";
@@ -183,7 +184,6 @@ export default function MeterDataPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-holds"] }),
   });
 
-  const acknowledgeEvents = useAcknowledge("/api/v1/meter-data/events");
   const acknowledgeAlarms = useAcknowledge("/api/v1/meter-data/alarms");
 
   return (
@@ -244,13 +244,7 @@ export default function MeterDataPage() {
       )}
 
       {tab === "events" && (
-        <MeterDataListTab<MeterEvent>
-          title="Events"
-          endpoint="/api/v1/meter-data/events"
-          filenamePrefix="MDMS_Events"
-          columns={eventColumns(acknowledgeEvents)}
-          rowKey={(r) => r.id}
-        />
+        <EventClassificationView endpointBase="/api/v1/meter-data/events" filenamePrefix="MDMS_Events" />
       )}
 
       {tab === "alarms" && (
