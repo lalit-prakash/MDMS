@@ -36,6 +36,7 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<PrepaidAccount> PrepaidAccounts => Set<PrepaidAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<SavedFilter> SavedFilters => Set<SavedFilter>();
+    public DbSet<DownloadRequest> DownloadRequests => Set<DownloadRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

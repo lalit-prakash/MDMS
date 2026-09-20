@@ -10,6 +10,7 @@ import { ReportTable, ReportColumn } from "./ReportTable";
 import { useReportQuery } from "@/lib/reports/useReportQuery";
 import { downloadCsv } from "@/lib/reports/downloadCsv";
 import { SavedFilters } from "./SavedFilters";
+import { RequestDownloadButton } from "./RequestDownloadButton";
 
 interface AppliedFilters {
   meterId: string;
@@ -166,6 +167,7 @@ export function MeterDataListTab<TRow>({
           >
             Download (CSV)
           </Button>
+          <RequestDownloadButton title={`${title} export`} path={fullPath} />
         </Stack>
       </Stack>
 

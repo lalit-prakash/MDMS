@@ -67,6 +67,11 @@ const STATUS_CATEGORY: Record<string, SemanticCategory> = {
   Critical: "error",
   // MeterEvent acknowledgement status (Open already covered above via ComplaintStatus)
   Acknowledged: "success",
+  // Download Request lifecycle
+  Processing: "info",
+  Completed: "success",
+  Pending: "warning",
+  Failed: "error",
   // LoadLimitState
   Normal: "success",
   Limited: "warning",
