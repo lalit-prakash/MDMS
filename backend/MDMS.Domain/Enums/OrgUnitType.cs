@@ -8,6 +8,7 @@ namespace MDMS.Domain.Enums;
 /// </summary>
 public enum OrgUnitType
 {
+    Region = 0,
     Zone = 1,
     Circle = 2,
     Division = 3,

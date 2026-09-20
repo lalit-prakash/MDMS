@@ -21,5 +21,15 @@ public class HierarchyNodeConfiguration : IEntityTypeConfiguration<HierarchyNode
         builder.Property(n => n.OperationalStatus).HasMaxLength(32);
         builder.Property(n => n.Latitude).HasColumnType("numeric(9,6)");
         builder.Property(n => n.Longitude).HasColumnType("numeric(9,6)");
+        builder.Property(n => n.MeterSerial).HasMaxLength(64);
+        builder.Property(n => n.MeterMake).HasMaxLength(64);
+        builder.Property(n => n.MultiplyingFactor).HasColumnType("numeric(18,4)");
+        builder.Property(n => n.Mect).HasColumnType("numeric(18,4)");
+        builder.Property(n => n.Mept).HasColumnType("numeric(18,4)");
+        builder.Property(n => n.ExternalCtRatio).HasMaxLength(32);
+        builder.Property(n => n.ExternalPtRatio).HasMaxLength(32);
+        builder.Property(n => n.FeederMode).HasMaxLength(64);
+        builder.Property(n => n.DtrType).HasMaxLength(64);
+        builder.Property(n => n.InstalledBy).HasMaxLength(64);
     }
 }

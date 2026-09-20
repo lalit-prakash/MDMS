@@ -4,14 +4,23 @@ import { useMemo } from "react";
 import { MenuItem, TextField } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
-import { OrgUnit } from "@/lib/types";
+import { OrgUnit, OrgUnitType } from "@/lib/types";
+
+const LEVELS: { type: OrgUnitType; label: string }[] = [
+  { type: "Region", label: "Region" },
+  { type: "Zone", label: "Zone" },
+  { type: "Circle", label: "Circle" },
+  { type: "Division", label: "Division" },
+  { type: "SubDivision", label: "Sub Division" },
+  { type: "Section", label: "Section" },
+];
 
 /**
- * Real Zone → Circle → Division → Sub Division → Section office filter, backed by the actual
- * OrgUnit tree ConfigController manages (never a fabricated Organisation/Hierarchy dropdown) —
- * one cascading select per level, each populated only with children of the level above. Selecting
- * any level reports that OrgUnit's id upward; the meter-data endpoints resolve it down to the
- * concrete meters under it via the real Substation → Feeder → DT → ServicePoint chain.
+ * Real Region → Zone → Circle → Division → Sub Division → Section office filter, backed by the
+ * actual OrgUnit tree ConfigController manages. One select per level; choosing a level narrows
+ * every finer level's options to that unit's descendants, and the filter value reported upward is
+ * always the finest unit chosen (the endpoints match anything at or beneath it). Levels a given
+ * hierarchy doesn't use simply show no options.
  */
 export function HierarchyFilter({ value, onChange }: { value: string; onChange: (orgUnitId: string) => void }) {
   const orgUnitsQuery = useQuery({
@@ -19,36 +28,39 @@ export function HierarchyFilter({ value, onChange }: { value: string; onChange: 
     queryFn: () => apiClient.get<OrgUnit[]>("/api/v1/config/org-units"),
   });
 
-  const units = orgUnitsQuery.data ?? [];
+  const units = useMemo(() => orgUnitsQuery.data ?? [], [orgUnitsQuery.data]);
   const byId = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
 
-  // The chain of selected units from Zone down to whatever is currently selected, so each level's
-  // dropdown can be scoped to children of the level above it.
-  const selectedChain = useMemo(() => {
-    const chain: OrgUnit[] = [];
-    let current = value ? byId.get(value) : undefined;
+  const isDescendantOf = (unit: OrgUnit, ancestorId: string) => {
+    let current: OrgUnit | undefined = unit;
     while (current) {
-      chain.unshift(current);
+      if (current.id === ancestorId) return true;
       current = current.parentId ? byId.get(current.parentId) : undefined;
     }
-    return chain;
-  }, [value, byId]);
+    return false;
+  };
 
-  const levels: { type: OrgUnit["unitType"]; label: string }[] = [
-    { type: "Zone", label: "Zone" },
-    { type: "Circle", label: "Circle" },
-    { type: "Division", label: "Division" },
-    { type: "SubDivision", label: "Sub Division" },
-    { type: "Section", label: "Section" },
-  ];
+  // The selected unit and its ancestors, keyed by level type.
+  const selectedByType = useMemo(() => {
+    const map = new Map<OrgUnitType, OrgUnit>();
+    let current = value ? byId.get(value) : undefined;
+    while (current) {
+      map.set(current.unitType, current);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return map;
+  }, [value, byId]);
 
   return (
     <>
-      {levels.map((level, i) => {
-        const parentId = i === 0 ? null : selectedChain[i - 1]?.id ?? null;
-        const options = units.filter((u) => u.unitType === level.type && (i === 0 ? true : u.parentId === parentId));
-        const selectedAtLevel = selectedChain[i]?.id ?? "";
-        if (i > 0 && !parentId) return null;
+      {LEVELS.map((level, i) => {
+        // The nearest coarser level that has a selection scopes this level's options.
+        const scopeAncestor = LEVELS.slice(0, i)
+          .reverse()
+          .map((l) => selectedByType.get(l.type))
+          .find(Boolean);
+        const options = units.filter((u) => u.unitType === level.type && (!scopeAncestor || isDescendantOf(u, scopeAncestor.id)));
+        if (options.length === 0 && !selectedByType.get(level.type)) return null;
 
         return (
           <TextField
@@ -56,8 +68,8 @@ export function HierarchyFilter({ value, onChange }: { value: string; onChange: 
             size="small"
             select
             label={level.label}
-            value={selectedAtLevel}
-            onChange={(e) => onChange(e.target.value)}
+            value={selectedByType.get(level.type)?.id ?? ""}
+            onChange={(e) => onChange(e.target.value || scopeAncestor?.id || "")}
             sx={{ minWidth: 160 }}
           >
             <MenuItem value="">All</MenuItem>

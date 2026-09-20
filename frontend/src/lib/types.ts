@@ -97,7 +97,7 @@ export interface HierarchyNode {
   parentId: string | null;
 }
 
-export type OrgUnitType = "Zone" | "Circle" | "Division" | "SubDivision" | "Section";
+export type OrgUnitType = "Region" | "Zone" | "Circle" | "Division" | "SubDivision" | "Section";
 
 export interface OrgUnit {
   id: string;

@@ -170,7 +170,7 @@ function OrgUnitsSection() {
     mutationFn: () =>
       apiClient.post<OrgUnit>("/api/v1/config/org-units", {
         unitType,
-        parentId: unitType === "Zone" ? null : parentId || null,
+        parentId: unitType === "Region" || unitType === "Zone" && !parentId ? null : parentId || null,
         code,
         name,
       }),
@@ -186,19 +186,20 @@ function OrgUnitsSection() {
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Organizational hierarchy (Zone → Circle → Division → Sub Division → Section)
+        Organizational hierarchy (Region → Zone → Circle → Division → Sub Division → Section)
       </Typography>
       <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
         <ErrorAlert error={error} onClose={() => setError(null)} />
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, flexWrap: "wrap" }}>
           <TextField select label="Level" size="small" value={unitType} onChange={(e) => setUnitType(e.target.value as OrgUnitType)} sx={{ minWidth: 160 }}>
+            <MenuItem value="Region">Region</MenuItem>
             <MenuItem value="Zone">Zone</MenuItem>
             <MenuItem value="Circle">Circle</MenuItem>
             <MenuItem value="Division">Division</MenuItem>
             <MenuItem value="SubDivision">Sub Division</MenuItem>
             <MenuItem value="Section">Section</MenuItem>
           </TextField>
-          {unitType !== "Zone" && (
+          {unitType !== "Region" && (
             <TextField select label="Parent" size="small" value={parentId} onChange={(e) => setParentId(e.target.value)} sx={{ minWidth: 220 }}>
               {query.data?.map((u) => (
                 <MenuItem key={u.id} value={u.id}>{u.unitType}: {u.name}</MenuItem>

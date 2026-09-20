@@ -14,6 +14,7 @@ interface DtrRow {
   feederName: string;
   substationCode: string;
   substationName: string;
+  region: string | null;
   zone: string | null;
   circle: string | null;
   division: string | null;
@@ -25,6 +26,11 @@ interface DtrRow {
   commissionedOn: string | null;
   operationalStatus: string | null;
   consumerCount: number;
+  meterSerial: string | null;
+  multiplyingFactor: number | null;
+  externalCtRatio: string | null;
+  dtrType: string | null;
+  installedBy: string | null;
 }
 
 const columns: ReportColumn<DtrRow>[] = [
@@ -32,6 +38,7 @@ const columns: ReportColumn<DtrRow>[] = [
   { key: "name", label: "DTR Name", render: (r) => r.name },
   { key: "feederCode", label: "Feeder", render: (r) => r.feederCode },
   { key: "substationCode", label: "Substation", render: (r) => r.substationCode },
+  { key: "region", label: "Region", render: (r) => r.region ?? "—" },
   { key: "zone", label: "Zone", render: (r) => r.zone ?? "—" },
   { key: "circle", label: "Circle", render: (r) => r.circle ?? "—" },
   { key: "division", label: "Division", render: (r) => r.division ?? "—" },
@@ -43,6 +50,11 @@ const columns: ReportColumn<DtrRow>[] = [
   { key: "commissionedOn", label: "Commissioned On", render: (r) => r.commissionedOn ?? "—" },
   { key: "operationalStatus", label: "Status", render: (r) => r.operationalStatus ?? "—" },
   { key: "consumerCount", label: "Consumer Count", align: "right", render: (r) => r.consumerCount },
+  { key: "msn", label: "MSN", render: (r) => r.meterSerial ?? "—" },
+  { key: "mf", label: "MF", align: "right", render: (r) => r.multiplyingFactor ?? "—" },
+  { key: "ctRatio", label: "External CT Ratio", render: (r) => r.externalCtRatio ?? "—" },
+  { key: "dtrType", label: "DTR Type", render: (r) => r.dtrType ?? "—" },
+  { key: "installedBy", label: "Installed By", render: (r) => r.installedBy ?? "—" },
 ];
 
 export default function DtrsPage() {

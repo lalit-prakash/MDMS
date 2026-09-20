@@ -44,6 +44,23 @@ public class HierarchyNode : Entity
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
 
+    /// <summary>
+    /// Metering-asset fields from the Feeder/DTR master sheets (the feeder/DT's own meter and its
+    /// CT/PT setup) — all nullable, set only via <see cref="SetAssetData"/>.
+    /// </summary>
+    public string? MeterSerial { get; private set; }
+    public string? MeterMake { get; private set; }
+    public decimal? MultiplyingFactor { get; private set; }
+    public string? ExternalCtRatio { get; private set; }
+    public string? ExternalPtRatio { get; private set; }
+    public decimal? Mect { get; private set; }
+    public decimal? Mept { get; private set; }
+    public string? FeederMode { get; private set; }
+    public string? DtrType { get; private set; }
+    public string? InstalledBy { get; private set; }
+    public int? Satno { get; private set; }
+    public DateTime? MdmAssetTimestampUtc { get; private set; }
+
     private HierarchyNode() { }
 
     /// <summary>A top-level <see cref="HierarchyNodeType.Substation"/> node has no parent.</summary>
@@ -113,6 +130,15 @@ public class HierarchyNode : Entity
         OperationalStatus = operationalStatus;
         Latitude = latitude;
         Longitude = longitude;
+    }
+
+    public void SetAssetData(
+        string? meterSerial, string? meterMake, decimal? multiplyingFactor, string? externalCtRatio, string? externalPtRatio,
+        decimal? mect, decimal? mept, string? feederMode, string? dtrType, string? installedBy, int? satno, DateTime? mdmAssetTimestampUtc)
+    {
+        MeterSerial = meterSerial; MeterMake = meterMake; MultiplyingFactor = multiplyingFactor;
+        ExternalCtRatio = externalCtRatio; ExternalPtRatio = externalPtRatio; Mect = mect; Mept = mept;
+        FeederMode = feederMode; DtrType = dtrType; InstalledBy = installedBy; Satno = satno; MdmAssetTimestampUtc = mdmAssetTimestampUtc;
     }
 
     private static string RequireCode(string code)

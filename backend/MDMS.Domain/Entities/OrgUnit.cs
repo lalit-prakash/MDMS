@@ -20,7 +20,19 @@ public class OrgUnit : Entity
 
     private OrgUnit() { }
 
-    /// <summary>A top-level <see cref="OrgUnitType.Zone"/> node has no parent.</summary>
+    /// <summary>A top-level <see cref="OrgUnitType.Region"/> node has no parent. Optional: a Zone may
+    /// also stand alone, for a DISCOM whose hierarchy starts at Zone.</summary>
+    public static OrgUnit CreateRegion(string code, string name)
+        => new()
+        {
+            UnitType = OrgUnitType.Region,
+            Code = RequireCode(code),
+            Name = RequireName(name),
+            ParentId = null
+        };
+
+    /// <summary>A <see cref="OrgUnitType.Zone"/> created this way has no parent (use
+    /// <see cref="CreateChild"/> to put a Zone under a Region).</summary>
     public static OrgUnit CreateZone(string code, string name)
         => new()
         {
@@ -40,12 +52,13 @@ public class OrgUnit : Entity
 
         var expectedParentType = unitType switch
         {
+            OrgUnitType.Zone => OrgUnitType.Region,
             OrgUnitType.Circle => OrgUnitType.Zone,
             OrgUnitType.Division => OrgUnitType.Circle,
             OrgUnitType.SubDivision => OrgUnitType.Division,
             OrgUnitType.Section => OrgUnitType.SubDivision,
-            OrgUnitType.Zone => throw new ArgumentException(
-                "A Zone has no parent; use CreateZone instead.", nameof(unitType)),
+            OrgUnitType.Region => throw new ArgumentException(
+                "A Region has no parent; use CreateRegion instead.", nameof(unitType)),
             _ => throw new ArgumentOutOfRangeException(nameof(unitType))
         };
 

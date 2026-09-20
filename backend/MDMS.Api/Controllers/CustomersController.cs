@@ -103,16 +103,32 @@ public class CustomersController : ControllerBase
         return Ok(customer);
     }
 
+    public record SetCustomerMeterAssetRequest(
+        string? MeterMake, string? MeterPhase, decimal? MultiplyingFactor, bool? IsMrRequiredDone,
+        int? Satno, DateTime? MdmAssetTimestampUtc, DateOnly? MeterReplacementDate);
+
+    [HttpPost("{id:guid}/meter-asset-data")]
+    public async Task<IActionResult> SetMeterAssetData(Guid id, [FromBody] SetCustomerMeterAssetRequest r, CancellationToken ct)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (customer is null) return NotFound();
+        customer.SetMeterAssetData(r.MeterMake, r.MeterPhase, r.MultiplyingFactor, r.IsMrRequiredDone, r.Satno, r.MdmAssetTimestampUtc, r.MeterReplacementDate);
+        await _db.SaveChangesAsync(ct);
+        return Ok(customer);
+    }
+
     private static (int page, int pageSize) Page(int? page, int? pageSize) => ReportPaging.Normalize(page, pageSize);
 
     public record ConsumerMasterRow(
         Guid Id, string AccountNumber, string Name, string? RrNumber, string? MeterNumber,
         string? DtrCode, string? FeederCode, string? SubstationCode,
-        string? Zone, string? Circle, string? Division, string? SubDivision, string? Section,
+        string? Region, string? Zone, string? Circle, string? Division, string? SubDivision, string? Section,
         string Address, string? MobileNumber, string? ConnectionStatus, DateOnly? ServiceDate,
         decimal? SanctionedLoadKw, decimal? ContractDemandKva, decimal? ConnectedLoadKw,
         string? LoadType, string? TariffCategoryCode, string? CommunicationType, string? PaymentMode,
-        bool? IsNetMeter, int? BillDay, string? BillCycle, decimal? Latitude, decimal? Longitude);
+        bool? IsNetMeter, int? BillDay, string? BillCycle, decimal? Latitude, decimal? Longitude,
+        string? MeterMake, string? MeterPhase, decimal? MultiplyingFactor, bool? IsMrRequiredDone, int? Satno,
+        DateTime? MdmAssetTimestampUtc, DateOnly? MeterReplacementDate);
 
     /// <summary>
     /// The full Consumer master-data listing driving the tree-like Consumer tab: every consumer
@@ -132,32 +148,13 @@ public class CustomersController : ControllerBase
         var servicePoints = await _db.ServicePoints.ToListAsync(ct);
         var hierarchyNodes = await _db.HierarchyNodes.ToListAsync(ct);
         var nodesById = hierarchyNodes.ToDictionary(n => n.Id);
-        var orgUnits = await _db.OrgUnits.ToListAsync(ct);
-        var orgUnitsById = orgUnits.ToDictionary(u => u.Id);
+        var resolveChain = OrgUnitChainResolver.Build(await _db.OrgUnits.ToListAsync(ct));
         var assignments = await _db.MeterAssignments.Where(a => a.EffectiveToUtc == null).ToListAsync(ct);
         var meters = await _db.Meters.ToListAsync(ct);
         var metersById = meters.ToDictionary(m => m.Id);
 
-        OrgUnitChain ResolveChain(Guid? orgUnitIdValue)
-        {
-            string? zone = null, circle = null, division = null, subDivision = null, section = null;
-            var current = orgUnitIdValue.HasValue && orgUnitsById.TryGetValue(orgUnitIdValue.Value, out var start) ? start : null;
-            while (current is not null)
-            {
-                switch (current.UnitType)
-                {
-                    case MDMS.Domain.Enums.OrgUnitType.Zone: zone = current.Name; break;
-                    case MDMS.Domain.Enums.OrgUnitType.Circle: circle = current.Name; break;
-                    case MDMS.Domain.Enums.OrgUnitType.Division: division = current.Name; break;
-                    case MDMS.Domain.Enums.OrgUnitType.SubDivision: subDivision = current.Name; break;
-                    case MDMS.Domain.Enums.OrgUnitType.Section: section = current.Name; break;
-                }
-                current = current.ParentId.HasValue && orgUnitsById.TryGetValue(current.ParentId.Value, out var parent) ? parent : null;
-            }
-            return new OrgUnitChain(zone, circle, division, subDivision, section);
-        }
-
         var rows = new List<ConsumerMasterRow>();
+        var chains = new Dictionary<Guid, OrgUnitChain>();
         foreach (var c in customers)
         {
             var sp = servicePoints.FirstOrDefault(x => x.CustomerId == c.Id);
@@ -168,28 +165,27 @@ public class CustomersController : ControllerBase
             if (dtNodeId.HasValue && dt?.Id != dtNodeId) continue;
             if (feederId.HasValue && feeder?.Id != feederId) continue;
 
-            var chain = ResolveChain(substation?.OrgUnitId);
+            var chain = resolveChain(substation?.OrgUnitId);
 
             var meterId = sp is not null ? assignments.FirstOrDefault(a => a.ServicePointId == sp.Id)?.MeterId : null;
             var meterNumber = meterId.HasValue && metersById.TryGetValue(meterId.Value, out var meter) ? meter.SerialNumber : null;
 
+            chains[c.Id] = chain;
             rows.Add(new ConsumerMasterRow(
                 c.Id, c.AccountNumber, c.Name, c.RrNumber, meterNumber,
                 dt?.Code, feeder?.Code, substation?.Code,
-                chain.Zone, chain.Circle, chain.Division, chain.SubDivision, chain.Section,
+                chain.Region?.Name, chain.Zone?.Name, chain.Circle?.Name, chain.Division?.Name, chain.SubDivision?.Name, chain.Section?.Name,
                 sp?.Address ?? "", c.MobileNumber, c.ConnectionStatus, c.ServiceDate,
                 c.SanctionedLoadKw, c.ContractDemandKva, c.ConnectedLoadKw,
                 c.LoadType, c.TariffCategoryCode, c.CommunicationType, c.PaymentMode,
-                c.IsNetMeter, c.BillDay, c.BillCycle, c.Latitude, c.Longitude));
+                c.IsNetMeter, c.BillDay, c.BillCycle, c.Latitude, c.Longitude,
+                c.MeterMake, c.MeterPhase, c.MultiplyingFactor, c.IsMrRequiredDone, c.Satno, c.MdmAssetTimestampUtc, c.MeterReplacementDate));
         }
 
         IEnumerable<ConsumerMasterRow> filtered = rows;
         if (orgUnitId.HasValue)
         {
-            var targetChain = ResolveChain(orgUnitId);
-            filtered = filtered.Where(r =>
-                r.Zone == targetChain.Zone || r.Circle == targetChain.Circle || r.Division == targetChain.Division ||
-                r.SubDivision == targetChain.SubDivision || r.Section == targetChain.Section);
+            filtered = filtered.Where(r => chains[r.Id].Contains(orgUnitId.Value));
         }
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -208,21 +204,21 @@ public class CustomersController : ControllerBase
         {
             var csv = CsvWriter.Write(
                 ["Account Number", "Name", "RR Number", "Meter Number", "DTR Code", "Feeder Code", "Substation Code",
-                 "Zone", "Circle", "Division", "Sub Division", "Section", "Address", "Mobile Number", "Connection Status",
+                 "Region", "Zone", "Circle", "Division", "Sub Division", "Section", "Address", "Mobile Number", "Connection Status",
                  "Service Date", "Sanctioned Load (kW)", "Contract Demand (kVA)", "Connected Load (kW)", "Load Type",
-                 "Tariff Category", "Communication", "Payment Mode", "Net Meter", "Bill Day", "Bill Cycle", "Latitude", "Longitude"],
+                 "Tariff Category", "Communication", "Payment Mode", "Net Meter", "Bill Day", "Bill Cycle", "Latitude", "Longitude",
+                 "Meter Make", "Phase", "MF", "MR Required Done", "Satno", "MDM Asset Timestamp (UTC)", "Meter Replacement Date"],
                 ordered, r => [r.AccountNumber, r.Name, r.RrNumber, r.MeterNumber, r.DtrCode, r.FeederCode, r.SubstationCode,
-                    r.Zone, r.Circle, r.Division, r.SubDivision, r.Section, r.Address, r.MobileNumber, r.ConnectionStatus,
+                    r.Region, r.Zone, r.Circle, r.Division, r.SubDivision, r.Section, r.Address, r.MobileNumber, r.ConnectionStatus,
                     r.ServiceDate?.ToString("yyyy-MM-dd"), r.SanctionedLoadKw, r.ContractDemandKva, r.ConnectedLoadKw, r.LoadType,
-                    r.TariffCategoryCode, r.CommunicationType, r.PaymentMode, r.IsNetMeter, r.BillDay, r.BillCycle, r.Latitude, r.Longitude]);
+                    r.TariffCategoryCode, r.CommunicationType, r.PaymentMode, r.IsNetMeter, r.BillDay, r.BillCycle, r.Latitude, r.Longitude,
+                    r.MeterMake, r.MeterPhase, r.MultiplyingFactor, r.IsMrRequiredDone, r.Satno, r.MdmAssetTimestampUtc, r.MeterReplacementDate?.ToString("yyyy-MM-dd")]);
             return File(csv, "text/csv", $"MDMS_Consumers_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
         }
 
         var pageRows = ordered.Skip((p - 1) * size).Take(size).ToList();
         return Ok(new ListResult<ConsumerMasterRow>(pageRows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
-
-    private record OrgUnitChain(string? Zone, string? Circle, string? Division, string? SubDivision, string? Section);
 
     public record AddServicePointRequest(string Address, Guid? DistributionTransformerNodeId);
 
