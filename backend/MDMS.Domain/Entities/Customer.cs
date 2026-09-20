@@ -39,6 +39,25 @@ public class Customer : Entity
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
 
+    /// <summary>Meter-related consumer master fields from the Consumer sheet (meter make/phase/MF,
+    /// MR flag, satno, asset timestamp, replacement date) — set via <see cref="SetMeterAssetData"/>.</summary>
+    public string? MeterMake { get; private set; }
+    public string? MeterPhase { get; private set; }
+    public decimal? MultiplyingFactor { get; private set; }
+    public bool? IsMrRequiredDone { get; private set; }
+    public int? Satno { get; private set; }
+    public DateTime? MdmAssetTimestampUtc { get; private set; }
+    public DateOnly? MeterReplacementDate { get; private set; }
+
+    public void SetMeterAssetData(
+        string? meterMake, string? meterPhase, decimal? multiplyingFactor, bool? isMrRequiredDone,
+        int? satno, DateTime? mdmAssetTimestampUtc, DateOnly? meterReplacementDate)
+    {
+        MeterMake = meterMake; MeterPhase = meterPhase; MultiplyingFactor = multiplyingFactor;
+        IsMrRequiredDone = isMrRequiredDone; Satno = satno; MdmAssetTimestampUtc = mdmAssetTimestampUtc;
+        MeterReplacementDate = meterReplacementDate;
+    }
+
     private Customer() { }
 
     public Customer(string accountNumber, string name)

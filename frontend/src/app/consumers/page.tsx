@@ -18,6 +18,7 @@ interface ConsumerMasterRow {
   dtrCode: string | null;
   feederCode: string | null;
   substationCode: string | null;
+  region: string | null;
   zone: string | null;
   circle: string | null;
   division: string | null;
@@ -37,6 +38,12 @@ interface ConsumerMasterRow {
   isNetMeter: boolean | null;
   billDay: number | null;
   billCycle: string | null;
+  meterMake: string | null;
+  meterPhase: string | null;
+  multiplyingFactor: number | null;
+  isMrRequiredDone: boolean | null;
+  satno: number | null;
+  meterReplacementDate: string | null;
 }
 
 interface CustomerResponse {
@@ -53,6 +60,7 @@ const columns: ReportColumn<ConsumerMasterRow>[] = [
   { key: "dtrCode", label: "DTR", render: (r) => r.dtrCode ?? "—" },
   { key: "feederCode", label: "Feeder", render: (r) => r.feederCode ?? "—" },
   { key: "substationCode", label: "Substation", render: (r) => r.substationCode ?? "—" },
+  { key: "region", label: "Region", render: (r) => r.region ?? "—" },
   { key: "zone", label: "Zone", render: (r) => r.zone ?? "—" },
   { key: "circle", label: "Circle", render: (r) => r.circle ?? "—" },
   { key: "division", label: "Division", render: (r) => r.division ?? "—" },
@@ -71,6 +79,12 @@ const columns: ReportColumn<ConsumerMasterRow>[] = [
   { key: "isNetMeter", label: "Net Meter", render: (r) => (r.isNetMeter === null ? "—" : r.isNetMeter ? "Yes" : "No") },
   { key: "billDay", label: "Bill Day", align: "right", render: (r) => r.billDay ?? "—" },
   { key: "billCycle", label: "Bill Cycle", render: (r) => r.billCycle ?? "—" },
+  { key: "meterMake", label: "Make", render: (r) => r.meterMake ?? "—" },
+  { key: "meterPhase", label: "Phase", render: (r) => r.meterPhase ?? "—" },
+  { key: "mf", label: "MF", align: "right", render: (r) => r.multiplyingFactor ?? "—" },
+  { key: "mr", label: "MR Required Done", render: (r) => (r.isMrRequiredDone === null ? "—" : r.isMrRequiredDone ? "Yes" : "No") },
+  { key: "satno", label: "Satno", align: "right", render: (r) => r.satno ?? "—" },
+  { key: "replaced", label: "Meter Replacement Date", render: (r) => r.meterReplacementDate ?? "—" },
 ];
 
 export default function ConsumersPage() {

@@ -47,4 +47,13 @@ public class OrgUnitTests
         Assert.Throws<ArgumentException>(() =>
             OrgUnit.CreateChild(OrgUnitType.Zone, zone, "Z2", "Zone Two"));
     }
+
+    [Fact]
+    public void Region_CanParentAZone_ButNotACircle()
+    {
+        var region = OrgUnit.CreateRegion("R1", "Region One");
+        var zone = OrgUnit.CreateChild(OrgUnitType.Zone, region, "Z1", "Zone One");
+        Assert.Equal(region.Id, zone.ParentId);
+        Assert.Throws<ArgumentException>(() => OrgUnit.CreateChild(OrgUnitType.Circle, region, "C1", "Circle One"));
+    }
 }

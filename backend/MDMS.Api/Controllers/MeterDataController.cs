@@ -70,29 +70,7 @@ public class MeterDataController : ControllerBase
 
         var nodes = await _db.HierarchyNodes.ToListAsync(ct);
         var nodesById = nodes.ToDictionary(n => n.Id);
-        var orgUnits = await _db.OrgUnits.ToListAsync(ct);
-        var orgUnitsById = orgUnits.ToDictionary(u => u.Id);
-
-        (string? zone, string? circle, string? division, string? subDivision, string? section) ResolveChain(Guid? id)
-        {
-            string? zone = null, circle = null, division = null, subDivision = null, section = null;
-            var current = id.HasValue && orgUnitsById.TryGetValue(id.Value, out var start) ? start : null;
-            while (current is not null)
-            {
-                switch (current.UnitType)
-                {
-                    case OrgUnitType.Zone: zone = current.Name; break;
-                    case OrgUnitType.Circle: circle = current.Name; break;
-                    case OrgUnitType.Division: division = current.Name; break;
-                    case OrgUnitType.SubDivision: subDivision = current.Name; break;
-                    case OrgUnitType.Section: section = current.Name; break;
-                }
-                current = current.ParentId.HasValue && orgUnitsById.TryGetValue(current.ParentId.Value, out var parent) ? parent : null;
-            }
-            return (zone, circle, division, subDivision, section);
-        }
-
-        var targetChain = orgUnitId.HasValue ? ResolveChain(orgUnitId) : ((string?, string?, string?, string?, string?)?)null;
+        var resolveChain = OrgUnitChainResolver.Build(await _db.OrgUnits.ToListAsync(ct));
 
         bool NodeMatches(HierarchyNode? dt)
         {
@@ -102,17 +80,10 @@ public class MeterDataController : ControllerBase
             var feeder = dt.ParentId.HasValue && nodesById.TryGetValue(dt.ParentId.Value, out var f) ? f : null;
             if (feederNodeId.HasValue && feeder?.Id != feederNodeId) return false;
 
-            if (targetChain.HasValue)
+            if (orgUnitId.HasValue)
             {
                 var substation = feeder?.ParentId.HasValue == true && nodesById.TryGetValue(feeder.ParentId!.Value, out var s) ? s : null;
-                var chain = ResolveChain(substation?.OrgUnitId);
-                var t = targetChain.Value;
-                var matches = (t.Item1 is not null && t.Item1 == chain.zone)
-                    || (t.Item2 is not null && t.Item2 == chain.circle)
-                    || (t.Item3 is not null && t.Item3 == chain.division)
-                    || (t.Item4 is not null && t.Item4 == chain.subDivision)
-                    || (t.Item5 is not null && t.Item5 == chain.section);
-                if (!matches) return false;
+                if (!resolveChain(substation?.OrgUnitId).Contains(orgUnitId.Value)) return false;
             }
 
             return true;

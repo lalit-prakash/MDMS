@@ -159,6 +159,21 @@ public class ConfigController : ControllerBase
         return Ok(node);
     }
 
+    public record SetHierarchyAssetDataRequest(
+        string? MeterSerial, string? MeterMake, decimal? MultiplyingFactor, string? ExternalCtRatio, string? ExternalPtRatio,
+        decimal? Mect, decimal? Mept, string? FeederMode, string? DtrType, string? InstalledBy, int? Satno, DateTime? MdmAssetTimestampUtc);
+
+    /// <summary>Sets a Feeder/DTR's own metering-asset fields (MSN, make, MF, CT/PT ratios, mode, installer).</summary>
+    [HttpPost("hierarchy/{id:guid}/asset-data")]
+    public async Task<IActionResult> SetHierarchyAssetData(Guid id, [FromBody] SetHierarchyAssetDataRequest r, CancellationToken ct)
+    {
+        var node = await _db.HierarchyNodes.FirstOrDefaultAsync(n => n.Id == id, ct);
+        if (node is null) return NotFound();
+        node.SetAssetData(r.MeterSerial, r.MeterMake, r.MultiplyingFactor, r.ExternalCtRatio, r.ExternalPtRatio, r.Mect, r.Mept, r.FeederMode, r.DtrType, r.InstalledBy, r.Satno, r.MdmAssetTimestampUtc);
+        await _db.SaveChangesAsync(ct);
+        return Ok(node);
+    }
+
     // ----- Organizational hierarchy (Zone / Circle / Division / Sub Division / Section) -----
 
     public record CreateOrgUnitRequest(OrgUnitType UnitType, Guid? ParentId, string Code, string Name);
@@ -191,9 +206,11 @@ public class ConfigController : ControllerBase
         OrgUnit unit;
         try
         {
-            if (request.UnitType == OrgUnitType.Zone)
+            if (request.UnitType == OrgUnitType.Region || (request.UnitType == OrgUnitType.Zone && request.ParentId is null))
             {
-                unit = OrgUnit.CreateZone(request.Code, request.Name);
+                unit = request.UnitType == OrgUnitType.Region
+                    ? OrgUnit.CreateRegion(request.Code, request.Name)
+                    : OrgUnit.CreateZone(request.Code, request.Name);
             }
             else
             {

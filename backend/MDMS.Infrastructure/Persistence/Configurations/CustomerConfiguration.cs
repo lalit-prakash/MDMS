@@ -26,5 +26,8 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.ConnectedLoadKw).HasColumnType("numeric(18,4)");
         builder.Property(c => c.Latitude).HasColumnType("numeric(9,6)");
         builder.Property(c => c.Longitude).HasColumnType("numeric(9,6)");
+        builder.Property(c => c.MeterMake).HasMaxLength(64);
+        builder.Property(c => c.MeterPhase).HasMaxLength(16);
+        builder.Property(c => c.MultiplyingFactor).HasColumnType("numeric(18,4)");
     }
 }
