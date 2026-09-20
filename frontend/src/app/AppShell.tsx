@@ -9,6 +9,7 @@ import {
   Avatar,
   Badge,
   Box,
+  Collapse,
   Drawer,
   IconButton,
   List,
@@ -24,6 +25,9 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import ExpandLessOutlinedIcon from "@mui/icons-material/ExpandLessOutlined";
+import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ChevronLeftOutlinedIcon from "@mui/icons-material/ChevronLeftOutlined";
@@ -62,7 +66,20 @@ interface ModuleLink {
 interface ModuleGroup {
   label: string;
   items: ModuleLink[];
+  /** Rendered as a single collapsible "tree" entry (one parent + indented children) instead of a
+   * flat labeled section — used for the Consumer/DTR/Feeder network hierarchy, where each child
+   * shows only that entity's own master data (see NETWORK_TREE_PARENT below). */
+  tree?: { parentLabel: string; parentIcon: ModuleLink["icon"] };
 }
+
+/** The Consumer/DTR/Feeder tree-like navigation: each leaf routes to its own master-data list
+ * page (real HierarchyNode/Customer data — see NetworkController/CustomersController), not a
+ * shared filtered view of one dataset. */
+const NETWORK_TREE_ITEMS: ModuleLink[] = [
+  { label: "Consumer", href: "/consumers", icon: GroupsOutlinedIcon },
+  { label: "DTR", href: "/dtrs", icon: ElectricMeterOutlinedIcon },
+  { label: "Feeder", href: "/feeders", icon: StorageOutlinedIcon },
+];
 
 // Grouping and icons mirror the approved design mockup — every entry here now has a real page
 // behind it (Consumers, Energy Analytics, Reports, Settings, Help & Support included).
@@ -73,6 +90,11 @@ const GROUPS: ModuleGroup[] = [
       { label: "Home", href: "/", icon: SpaceDashboardOutlinedIcon },
       { label: "Reports", href: "/reports", icon: AssessmentOutlinedIcon },
     ],
+  },
+  {
+    label: "Network",
+    items: NETWORK_TREE_ITEMS,
+    tree: { parentLabel: "Consumer / DTR / Feeder", parentIcon: AccountTreeOutlinedIcon },
   },
   {
     label: "Operations",
@@ -93,7 +115,6 @@ const GROUPS: ModuleGroup[] = [
   {
     label: "Customer",
     items: [
-      { label: "Consumers", href: "/consumers", icon: GroupsOutlinedIcon },
       { label: "Complaints", href: "/complaints", icon: SupportAgentOutlinedIcon },
       { label: "Prepaid", href: "/prepaid", icon: AccountBalanceWalletOutlinedIcon },
     ],
@@ -128,6 +149,9 @@ function SidebarContent({
   onToggleCollapsed?: () => void;
   showCollapseToggle: boolean;
 }) {
+  const networkGroupActive = NETWORK_TREE_ITEMS.some((m) => isActive(pathname, m.href));
+  const [treeOpen, setTreeOpen] = useState<boolean>(true);
+
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "var(--color-bg-sidebar)" }}>
       <Toolbar sx={{ gap: "var(--space-2)", px: collapsed ? "var(--space-3)" : "var(--space-5)", justifyContent: collapsed ? "center" : "flex-start" }}>
@@ -140,7 +164,84 @@ function SidebarContent({
       </Toolbar>
 
       <List sx={{ px: collapsed ? "var(--space-2)" : "var(--space-3)", py: "var(--space-2)", flex: 1, overflowY: "auto" }}>
-        {GROUPS.map((group) => (
+        {GROUPS.map((group) =>
+          group.tree ? (
+            <Box key={group.label} sx={{ mb: "var(--space-2)" }}>
+              {(() => {
+                const ParentIcon = group.tree.parentIcon;
+                const parentButton = (
+                  <ListItemButton
+                    onClick={() => (collapsed ? onNavigate(group.items[0].href) : setTreeOpen((o) => !o))}
+                    selected={networkGroupActive}
+                    sx={{
+                      borderRadius: "var(--radius-md)",
+                      mb: "2px",
+                      pl: collapsed ? "var(--space-3)" : "var(--space-4)",
+                      justifyContent: collapsed ? "center" : "flex-start",
+                      color: networkGroupActive ? "var(--color-sidebar-active-text)" : "var(--color-sidebar-text)",
+                      "&.Mui-selected": { bgcolor: "var(--color-sidebar-active)" },
+                      "&:hover": { bgcolor: "var(--color-sidebar-hover)" },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, color: "var(--color-sidebar-text-secondary)" }}>
+                      <ParentIcon fontSize="small" />
+                    </ListItemIcon>
+                    {!collapsed && (
+                      <>
+                        <ListItemText primary="Network" slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 600 } } }} />
+                        {treeOpen ? <ExpandLessOutlinedIcon fontSize="small" /> : <ExpandMoreOutlinedIcon fontSize="small" />}
+                      </>
+                    )}
+                  </ListItemButton>
+                );
+                return collapsed ? (
+                  <Tooltip title="Consumer / DTR / Feeder" placement="right">
+                    {parentButton}
+                  </Tooltip>
+                ) : (
+                  parentButton
+                );
+              })()}
+              <Collapse in={collapsed || treeOpen}>
+                {group.items.map((m) => {
+                  const active = isActive(pathname, m.href);
+                  const Icon = m.icon;
+                  const child = (
+                    <ListItemButton
+                      key={m.href}
+                      selected={active}
+                      onClick={() => onNavigate(m.href)}
+                      sx={{
+                        position: "relative",
+                        borderRadius: "var(--radius-md)",
+                        mb: "2px",
+                        pl: collapsed ? "var(--space-3)" : "var(--space-8)",
+                        justifyContent: collapsed ? "center" : "flex-start",
+                        color: active ? "var(--color-sidebar-active-text)" : "var(--color-sidebar-text)",
+                        bgcolor: active ? "var(--color-sidebar-active)" : "transparent",
+                        "&.Mui-selected": { bgcolor: "var(--color-sidebar-active)" },
+                        "&:hover": { bgcolor: "var(--color-sidebar-hover)" },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: collapsed ? 0 : 28, color: active ? "var(--color-sidebar-active-text)" : "var(--color-sidebar-text-secondary)" }}>
+                        <Icon fontSize="small" />
+                      </ListItemIcon>
+                      {!collapsed && (
+                        <ListItemText primary={m.label} slotProps={{ primary: { sx: { fontSize: 13, fontWeight: active ? 600 : 500 } } }} />
+                      )}
+                    </ListItemButton>
+                  );
+                  return collapsed ? (
+                    <Tooltip key={m.href} title={m.label} placement="right">
+                      {child}
+                    </Tooltip>
+                  ) : (
+                    child
+                  );
+                })}
+              </Collapse>
+            </Box>
+          ) : (
           <Box key={group.label} sx={{ mb: "var(--space-2)" }}>
             {!collapsed && (
               <Typography
@@ -218,7 +319,8 @@ function SidebarContent({
               );
             })}
           </Box>
-        ))}
+          )
+        )}
       </List>
 
       {showCollapseToggle && (

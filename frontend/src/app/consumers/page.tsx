@@ -1,48 +1,83 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Box,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  TextField,
-  Button,
-  Stack,
-  Alert,
-  Chip,
-} from "@mui/material";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Box, Paper, TextField, Button, Stack, Alert } from "@mui/material";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { PageHeader } from "@/components/PageHeader";
+import { ReportColumn } from "@/components/reports/ReportTable";
+import { MasterDataListView } from "@/components/reports/MasterDataListView";
 
-interface ServicePointSummary {
+interface ConsumerMasterRow {
   id: string;
+  accountNumber: string;
+  name: string;
+  rrNumber: string | null;
+  meterNumber: string | null;
+  dtrCode: string | null;
+  feederCode: string | null;
+  substationCode: string | null;
+  zone: string | null;
+  circle: string | null;
+  division: string | null;
+  subDivision: string | null;
+  section: string | null;
   address: string;
-  distributionTransformerNodeId: string | null;
+  mobileNumber: string | null;
+  connectionStatus: string | null;
+  serviceDate: string | null;
+  sanctionedLoadKw: number | null;
+  contractDemandKva: number | null;
+  connectedLoadKw: number | null;
+  loadType: string | null;
+  tariffCategoryCode: string | null;
+  communicationType: string | null;
+  paymentMode: string | null;
+  isNetMeter: boolean | null;
+  billDay: number | null;
+  billCycle: string | null;
 }
+
 interface CustomerResponse {
   id: string;
   accountNumber: string;
   name: string;
-  servicePoints: ServicePointSummary[];
 }
+
+const columns: ReportColumn<ConsumerMasterRow>[] = [
+  { key: "accountNumber", label: "Account Number", render: (r) => r.accountNumber },
+  { key: "name", label: "Consumer Name", render: (r) => r.name },
+  { key: "rrNumber", label: "RR Number", render: (r) => r.rrNumber ?? "—" },
+  { key: "meterNumber", label: "Meter Number", render: (r) => r.meterNumber ?? "—" },
+  { key: "dtrCode", label: "DTR", render: (r) => r.dtrCode ?? "—" },
+  { key: "feederCode", label: "Feeder", render: (r) => r.feederCode ?? "—" },
+  { key: "substationCode", label: "Substation", render: (r) => r.substationCode ?? "—" },
+  { key: "zone", label: "Zone", render: (r) => r.zone ?? "—" },
+  { key: "circle", label: "Circle", render: (r) => r.circle ?? "—" },
+  { key: "division", label: "Division", render: (r) => r.division ?? "—" },
+  { key: "subDivision", label: "Sub Division", render: (r) => r.subDivision ?? "—" },
+  { key: "address", label: "Address", render: (r) => r.address },
+  { key: "mobileNumber", label: "Mobile Number", render: (r) => r.mobileNumber ?? "—" },
+  { key: "connectionStatus", label: "Connection Status", render: (r) => r.connectionStatus ?? "—" },
+  { key: "serviceDate", label: "Service Date", render: (r) => r.serviceDate ?? "—" },
+  { key: "sanctionedLoadKw", label: "Sanctioned Load (kW)", align: "right", render: (r) => r.sanctionedLoadKw ?? "—" },
+  { key: "contractDemandKva", label: "Contract Demand (kVA)", align: "right", render: (r) => r.contractDemandKva ?? "—" },
+  { key: "connectedLoadKw", label: "Connected Load (kW)", align: "right", render: (r) => r.connectedLoadKw ?? "—" },
+  { key: "loadType", label: "Load Type", render: (r) => r.loadType ?? "—" },
+  { key: "tariffCategoryCode", label: "Tariff Category", render: (r) => r.tariffCategoryCode ?? "—" },
+  { key: "communicationType", label: "Communication", render: (r) => r.communicationType ?? "—" },
+  { key: "paymentMode", label: "Payment Mode", render: (r) => r.paymentMode ?? "—" },
+  { key: "isNetMeter", label: "Net Meter", render: (r) => (r.isNetMeter === null ? "—" : r.isNetMeter ? "Yes" : "No") },
+  { key: "billDay", label: "Bill Day", align: "right", render: (r) => r.billDay ?? "—" },
+  { key: "billCycle", label: "Bill Cycle", render: (r) => r.billCycle ?? "—" },
+];
 
 export default function ConsumersPage() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  const customersQuery = useQuery({
-    queryKey: ["customers", search],
-    queryFn: () => apiClient.get<CustomerResponse[]>(`/api/v1/customers${search ? `?search=${encodeURIComponent(search)}` : ""}`),
-  });
 
   const createCustomer = useMutation({
     mutationFn: () => apiClient.post<CustomerResponse>("/api/v1/customers", { accountNumber, name }),
@@ -50,21 +85,16 @@ export default function ConsumersPage() {
       setAccountNumber("");
       setName("");
       setError(null);
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["report", "/api/v1/customers/master"] });
     },
     onError: (err: unknown) => setError(err instanceof ApiError ? err.body || err.message : "Failed to create consumer."),
   });
 
   return (
     <Box>
-      <PageHeader icon={<GroupsOutlinedIcon fontSize="small" />} title="Consumers" />
-      <Stack direction="row" sx={{ mb: 3 }}>
-        <Alert severity="info" sx={{ flex: 1 }}>
-          Master data only — MDMS records the consumer/service-point identity; tariff, billing, and connection-status facts belong to downstream billing systems, per this data model&rsquo;s own design.
-        </Alert>
-      </Stack>
+      <PageHeader icon={<GroupsOutlinedIcon fontSize="small" />} title="Consumer" />
 
-      <Paper variant="outlined" sx={{ p: 3, mb: 4 }}>
+      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
@@ -79,50 +109,14 @@ export default function ConsumersPage() {
         </Stack>
       </Paper>
 
-      <TextField
-        size="small"
-        label="Search"
-        placeholder="Account number or name"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 2, minWidth: 280 }}
+      <MasterDataListView<ConsumerMasterRow>
+        title="Consumer Master Data"
+        endpoint="/api/v1/customers/master"
+        filenamePrefix="MDMS_Consumers"
+        columns={columns}
+        rowKey={(r) => r.id}
+        searchPlaceholder="Account number, name, RR number, or meter number"
       />
-
-      <Paper variant="outlined" sx={{ overflowX: "auto" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Account Number</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Service Points</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {customersQuery.data?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={3}>No consumers recorded yet.</TableCell>
-              </TableRow>
-            )}
-            {customersQuery.data?.map((c) => (
-              <TableRow key={c.id} hover>
-                <TableCell sx={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{c.accountNumber}</TableCell>
-                <TableCell>{c.name}</TableCell>
-                <TableCell>
-                  {c.servicePoints.length === 0 ? (
-                    "—"
-                  ) : (
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                      {c.servicePoints.map((sp) => (
-                        <Chip key={sp.id} size="small" label={sp.address} variant="outlined" />
-                      ))}
-                    </Box>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
     </Box>
   );
 }
