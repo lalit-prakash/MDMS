@@ -47,6 +47,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
+import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
 import { useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { useAuth } from "@/lib/session/AuthContext";
@@ -89,6 +90,7 @@ const GROUPS: ModuleGroup[] = [
     items: [
       { label: "Home", href: "/", icon: SpaceDashboardOutlinedIcon },
       { label: "Reports", href: "/reports", icon: AssessmentOutlinedIcon },
+      { label: "Download Requests", href: "/downloads", icon: CloudDownloadOutlinedIcon },
     ],
   },
   {

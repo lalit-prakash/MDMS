@@ -37,6 +37,7 @@ public interface IMdmsDbContext
     DbSet<PrepaidAccount> PrepaidAccounts { get; }
     DbSet<WalletTransaction> WalletTransactions { get; }
     DbSet<SavedFilter> SavedFilters { get; }
+    DbSet<DownloadRequest> DownloadRequests { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

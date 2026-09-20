@@ -11,6 +11,7 @@ import { HierarchyFilter } from "./HierarchyFilter";
 import { useReportQuery } from "@/lib/reports/useReportQuery";
 import { downloadCsv } from "@/lib/reports/downloadCsv";
 import { SavedFilters } from "./SavedFilters";
+import { RequestDownloadButton } from "./RequestDownloadButton";
 
 /**
  * Shared shell for a network master-data listing (Consumer / DTR / Feeder): a search box + the
@@ -130,6 +131,7 @@ export function MasterDataListView<TRow>({
           >
             Download (CSV)
           </Button>
+          <RequestDownloadButton title={`${title} export`} path={fullPath} />
         </Stack>
       </Stack>
 
