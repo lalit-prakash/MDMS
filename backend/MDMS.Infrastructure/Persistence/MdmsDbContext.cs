@@ -35,6 +35,7 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<RiskSignal> RiskSignals => Set<RiskSignal>();
     public DbSet<PrepaidAccount> PrepaidAccounts => Set<PrepaidAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<SavedFilter> SavedFilters => Set<SavedFilter>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

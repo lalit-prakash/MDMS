@@ -10,6 +10,7 @@ import { ReportTable, ReportColumn } from "./ReportTable";
 import { HierarchyFilter } from "./HierarchyFilter";
 import { useReportQuery } from "@/lib/reports/useReportQuery";
 import { downloadCsv } from "@/lib/reports/downloadCsv";
+import { SavedFilters } from "./SavedFilters";
 
 /**
  * Shared shell for a network master-data listing (Consumer / DTR / Feeder): a search box + the
@@ -59,6 +60,16 @@ export function MasterDataListView<TRow>({
             </Typography>
           </Stack>
           <Stack direction="row" spacing={1}>
+            <SavedFilters
+              screen={endpoint}
+              current={{ ...(search ? { search } : {}), ...(orgUnitId ? { orgUnitId } : {}) }}
+              onLoad={(values) => {
+                setSearchDraft(values.search ?? "");
+                setSearch(values.search ?? "");
+                setOrgUnitDraft(values.orgUnitId ?? "");
+                setOrgUnitId(values.orgUnitId ?? "");
+              }}
+            />
             <Button
               size="small"
               startIcon={<RefreshOutlinedIcon fontSize="small" />}
