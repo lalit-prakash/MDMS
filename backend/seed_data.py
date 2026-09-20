@@ -117,6 +117,11 @@ def main():
                         "intervalStartUtc": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                         "intervalEndUtc": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                         "cumulativeReading": round(cumulative, 3),
+                        "averageVoltage": round(random.uniform(228, 242), 2),
+                        "averageCurrent": round(random.uniform(0.5, 6.0), 3),
+                        "cumulativeKvahImport": round(cumulative * 1.05, 3),
+                        "cumulativeKwhExport": round(cumulative * 0.02, 3),
+                        "cumulativeKvahExport": round(cumulative * 0.021, 3),
                     })
                 slot += 1
         # Ingest in chunks to keep request bodies reasonable.
