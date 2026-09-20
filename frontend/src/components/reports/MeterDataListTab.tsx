@@ -9,6 +9,7 @@ import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import { ReportTable, ReportColumn } from "./ReportTable";
 import { useReportQuery } from "@/lib/reports/useReportQuery";
 import { downloadCsv } from "@/lib/reports/downloadCsv";
+import { SavedFilters } from "./SavedFilters";
 
 interface AppliedFilters {
   meterId: string;
@@ -34,6 +35,9 @@ export function MeterDataListTab<TRow>({
   rowKey,
   dateFieldType = "datetime-local",
   extraFilters,
+  extraValues,
+  onExtraValuesLoad,
+  screenKey,
 }: {
   title: string;
   endpoint: string;
@@ -46,6 +50,12 @@ export function MeterDataListTab<TRow>({
   rowKey: (row: TRow) => string;
   dateFieldType?: "date" | "datetime-local";
   extraFilters?: React.ReactNode;
+  /** Current values of filters owned by the parent (e.g. { orgUnitId }), included when saving. */
+  extraValues?: Record<string, string>;
+  /** Called when a saved filter set is loaded, so the parent can restore its own filters. */
+  onExtraValuesLoad?: (values: Record<string, string>) => void;
+  /** Identifies this screen for saved filters; defaults to the endpoint. */
+  screenKey?: string;
 }) {
   const [draft, setDraft] = useState<AppliedFilters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<AppliedFilters>(EMPTY_FILTERS);
@@ -57,6 +67,9 @@ export function MeterDataListTab<TRow>({
   if (applied.fromDate) params.set("fromDate", dateFieldType === "date" ? applied.fromDate : `${applied.fromDate}:00Z`);
   if (applied.toDate) params.set("toDate", dateFieldType === "date" ? applied.toDate : `${applied.toDate}:00Z`);
   const filterQuery = params.toString() ? `?${params.toString()}` : "";
+
+  const savedValues: Record<string, string> = {};
+  for (const [k, v] of Object.entries({ ...applied, ...extraValues })) if (v) savedValues[k] = v;
 
   const { data, isLoading, isError, setPage, setPageSize, fullPath } = useReportQuery<TRow, undefined>(endpoint, filterQuery);
 
@@ -73,6 +86,20 @@ export function MeterDataListTab<TRow>({
             </Typography>
           </Stack>
           <Stack direction="row" spacing={1}>
+            <SavedFilters
+              screen={screenKey ?? endpoint}
+              current={savedValues}
+              onLoad={(values) => {
+                const next: AppliedFilters = {
+                  meterId: values.meterId ?? "",
+                  fromDate: values.fromDate ?? "",
+                  toDate: values.toDate ?? "",
+                };
+                setDraft(next);
+                setApplied(next);
+                onExtraValuesLoad?.(values);
+              }}
+            />
             <Button
               size="small"
               startIcon={<RefreshOutlinedIcon fontSize="small" />}

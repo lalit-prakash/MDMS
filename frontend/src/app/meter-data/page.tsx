@@ -202,6 +202,11 @@ export default function MeterDataPage() {
 
   const hierarchyFilter = <HierarchyFilter value={orgUnitId} onChange={setOrgUnitId} />;
   const hierarchyParams = orgUnitId ? { orgUnitId } : undefined;
+  const savedFilterProps = {
+    extraFilters: hierarchyFilter,
+    extraValues: (orgUnitId ? { orgUnitId } : {}) as Record<string, string>,
+    onExtraValuesLoad: (v: Record<string, string>) => setOrgUnitId(v.orgUnitId ?? ""),
+  };
 
   return (
     <Box>
@@ -221,7 +226,7 @@ export default function MeterDataPage() {
           filenamePrefix="MDMS_LoadSurvey"
           columns={lsColumns}
           rowKey={(r) => r.id}
-          extraFilters={hierarchyFilter}
+          {...savedFilterProps}
         />
       )}
 
@@ -234,7 +239,7 @@ export default function MeterDataPage() {
           columns={dlpColumns}
           rowKey={(r) => r.id}
           dateFieldType="date"
-          extraFilters={hierarchyFilter}
+          {...savedFilterProps}
         />
       )}
 
@@ -246,7 +251,7 @@ export default function MeterDataPage() {
           filenamePrefix="MDMS_InstantaneousProfile"
           columns={ipColumns}
           rowKey={(r) => r.id}
-          extraFilters={hierarchyFilter}
+          {...savedFilterProps}
         />
       )}
 
@@ -259,7 +264,7 @@ export default function MeterDataPage() {
           columns={bpColumns}
           rowKey={(r) => r.id}
           dateFieldType="date"
-          extraFilters={hierarchyFilter}
+          {...savedFilterProps}
         />
       )}
 
@@ -275,7 +280,7 @@ export default function MeterDataPage() {
           filenamePrefix="MDMS_Alarms"
           columns={eventColumns(acknowledgeAlarms)}
           rowKey={(r) => r.id}
-          extraFilters={hierarchyFilter}
+          {...savedFilterProps}
         />
       )}
     </Box>
