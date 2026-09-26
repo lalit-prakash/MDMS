@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -187,16 +186,9 @@ class _HomeTab extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
-                      ),
-                      const Expanded(child: _BalanceSparkline()),
-                    ],
+                  Text(
+                    s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
                   ),
                   if (s.isConnected == false) ...[
                     const SizedBox(height: 6),
@@ -392,46 +384,5 @@ class _HomeTab extends ConsumerWidget {
     return pctDiff > 0
         ? "Your consumption today is ${pctDiff.toStringAsFixed(0)}% higher than your recent daily average."
         : "Your consumption today is ${pctDiff.abs().toStringAsFixed(0)}% lower than your recent daily average.";
-  }
-}
-
-/// A small inline trend of the wallet's own real balance history (from WalletTransaction.
-/// BalanceAfter, oldest-to-newest of the last 10 entries) — never a decorative random squiggle.
-class _BalanceSparkline extends ConsumerWidget {
-  const _BalanceSparkline();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final txAsync = ref.watch(transactionsProvider);
-    return txAsync.maybeWhen(
-      data: (rows) {
-        if (rows.length < 2) return const SizedBox.shrink();
-        final ordered = rows.take(10).toList().reversed.toList();
-        final spots = [for (var i = 0; i < ordered.length; i++) FlSpot(i.toDouble(), ordered[i].balanceAfter)];
-        return SizedBox(
-          height: 36,
-          width: 90,
-          child: LineChart(
-            LineChartData(
-              gridData: const FlGridData(show: false),
-              borderData: FlBorderData(show: false),
-              titlesData: const FlTitlesData(show: false),
-              lineTouchData: const LineTouchData(enabled: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  color: Colors.white,
-                  barWidth: 2,
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(show: true, color: Colors.white.withValues(alpha: 0.15)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      orElse: () => const SizedBox.shrink(),
-    );
   }
 }

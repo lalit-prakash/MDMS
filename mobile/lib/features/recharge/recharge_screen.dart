@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -120,42 +119,9 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
-                        style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
-                      ),
-                      Expanded(
-                        child: txAsync.maybeWhen(
-                          data: (rows) {
-                            if (rows.length < 2) return const SizedBox.shrink();
-                            final ordered = rows.take(10).toList().reversed.toList();
-                            return SizedBox(
-                              height: 32,
-                              child: LineChart(LineChartData(
-                                gridData: const FlGridData(show: false),
-                                borderData: FlBorderData(show: false),
-                                titlesData: const FlTitlesData(show: false),
-                                lineTouchData: const LineTouchData(enabled: false),
-                                lineBarsData: [
-                                  LineChartBarData(
-                                    spots: [for (var i = 0; i < ordered.length; i++) FlSpot(i.toDouble(), ordered[i].balanceAfter)],
-                                    isCurved: true,
-                                    color: Colors.white,
-                                    barWidth: 2,
-                                    dotData: const FlDotData(show: false),
-                                  ),
-                                ],
-                              )),
-                            );
-                          },
-                          orElse: () => const SizedBox.shrink(),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
                   ),
                   if (s.lastRechargeAmount != null) ...[
                     const SizedBox(height: 10),

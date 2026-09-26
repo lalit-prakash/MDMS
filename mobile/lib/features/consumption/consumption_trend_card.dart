@@ -134,30 +134,37 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              isInr ? _currency.format(total) : '${total.toStringAsFixed(2)} Units',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(width: 10),
-            if (changePct != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (changePct >= 0 ? AppColors.warning : AppColors.success).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(changePct >= 0 ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: changePct >= 0 ? AppColors.warning : AppColors.success),
-                    const SizedBox(width: 2),
-                    Text('${changePct.abs().toStringAsFixed(1)}%',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: changePct >= 0 ? AppColors.warning : AppColors.success)),
-                  ],
-                ),
+            Expanded(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.end,
+                spacing: 10,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    isInr ? _currency.format(total) : '${total.toStringAsFixed(2)} Units',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                  ),
+                  if (changePct != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (changePct >= 0 ? AppColors.warning : AppColors.success).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(changePct >= 0 ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: changePct >= 0 ? AppColors.warning : AppColors.success),
+                          const SizedBox(width: 2),
+                          Text('${changePct.abs().toStringAsFixed(1)}%',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: changePct >= 0 ? AppColors.warning : AppColors.success)),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-            const Spacer(),
+            ),
+            const SizedBox(width: 8),
             _ToggleBar<_TrendRange>(
               value: _range,
               options: {for (final r in _TrendRange.values) r: r.label},
