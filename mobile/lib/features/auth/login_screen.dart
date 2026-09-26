@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
+import '../recharge/guest_recharge_screen.dart';
 
 /// Login by Consumer Number + registered mobile number.
 ///
@@ -44,11 +45,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             'mobileNumber': _mobileController.text.trim(),
           }));
       final data = response.data as Map<String, dynamic>;
-      await ref.read(sessionProvider.notifier).signIn(ConsumerSession(
+      await ref.read(sessionListProvider.notifier).signIn(ConsumerSession(
             accessToken: data['accessToken'] as String,
             consumerId: data['consumerId'] as String,
             name: data['name'] as String,
             accountNumber: data['accountNumber'] as String,
+            mobileNumber: _mobileController.text.trim(),
           ));
     } catch (e) {
       setState(() => _error = e.toString());
@@ -104,6 +106,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: _loading
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Login'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuestRechargeScreen())),
+                    child: const Text('Recharge without logging in'),
                   ),
                 ],
               ),

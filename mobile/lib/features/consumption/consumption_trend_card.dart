@@ -11,7 +11,7 @@ enum _TrendUnit { kwh, inr }
 
 extension on _TrendRange {
   String get apiValue => switch (this) { _TrendRange.today => 'today', _TrendRange.days7 => '7days', _TrendRange.days30 => '30days' };
-  String get label => switch (this) { _TrendRange.today => 'Today', _TrendRange.days7 => '7 Days', _TrendRange.days30 => '30 Days' };
+  String get label => switch (this) { _TrendRange.today => 'Today', _TrendRange.days7 => 'L7D', _TrendRange.days30 => 'L30D' };
 }
 
 class TrendPoint {
@@ -24,19 +24,33 @@ class TrendPoint {
         inr = (j['inr'] as num?)?.toDouble();
 }
 
+class EnvironmentalImpact {
+  final double totalKwh;
+  final double totalPowerOnHours;
+  final double co2Kg;
+  final double treesSaved;
+  EnvironmentalImpact.fromJson(Map<String, dynamic> j)
+      : totalKwh = (j['totalKwh'] as num).toDouble(),
+        totalPowerOnHours = (j['totalPowerOnHours'] as num).toDouble(),
+        co2Kg = (j['co2Kg'] as num).toDouble(),
+        treesSaved = (j['treesSaved'] as num).toDouble();
+}
+
 class TrendResponse {
   final List<TrendPoint> points;
   final TrendPoint? maxKwh;
   final TrendPoint? minKwh;
   final TrendPoint? maxInr;
   final TrendPoint? minInr;
+  final EnvironmentalImpact impact;
 
   TrendResponse.fromJson(Map<String, dynamic> j)
       : points = (j['points'] as List).map((e) => TrendPoint.fromJson(e as Map<String, dynamic>)).toList(),
         maxKwh = j['maxKwhPoint'] != null ? TrendPoint.fromJson(j['maxKwhPoint'] as Map<String, dynamic>) : null,
         minKwh = j['minKwhPoint'] != null ? TrendPoint.fromJson(j['minKwhPoint'] as Map<String, dynamic>) : null,
         maxInr = j['maxInrPoint'] != null ? TrendPoint.fromJson(j['maxInrPoint'] as Map<String, dynamic>) : null,
-        minInr = j['minInrPoint'] != null ? TrendPoint.fromJson(j['minInrPoint'] as Map<String, dynamic>) : null;
+        minInr = j['minInrPoint'] != null ? TrendPoint.fromJson(j['minInrPoint'] as Map<String, dynamic>) : null,
+        impact = EnvironmentalImpact.fromJson(j['impact'] as Map<String, dynamic>);
 }
 
 final _trendProvider = FutureProvider.autoDispose.family<TrendResponse, String>((ref, range) async {
@@ -48,11 +62,10 @@ final _trendProvider = FutureProvider.autoDispose.family<TrendResponse, String>(
 
 final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
-/// Consumption Trend card for the Home dashboard: Today / 7 Days / 30 Days, each viewable as
-/// real kWh (Load Survey / Daily Load Profile) or real INR (the actual amount this project's own
-/// daily-billing run debited from the wallet for that day — never an estimated unit cost). A day
-/// with no billing run simply has no INR point; if none of the visible days have one, the INR
-/// view says so instead of showing an empty chart.
+/// Consumption Trend card for the Home dashboard: Today / L7D / L30D, viewable as real kWh
+/// (Load Survey / Daily Load Profile) or real INR (the actual amount this project's own
+/// daily-billing run debited from the wallet for that day -- never an estimated unit cost). A
+/// day with no billing run simply has no INR point.
 class ConsumptionTrendCard extends ConsumerStatefulWidget {
   const ConsumptionTrendCard({super.key});
 
@@ -75,32 +88,22 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                const Icon(Icons.bolt, color: AppColors.accent, size: 20),
+                const SizedBox(width: 8),
                 Text('Consumption Trend', style: Theme.of(context).textTheme.titleMedium),
-                SegmentedButton<_TrendUnit>(
-                  segments: const [
-                    ButtonSegment(value: _TrendUnit.kwh, label: Text('kWh')),
-                    ButtonSegment(value: _TrendUnit.inr, label: Text('₹')),
-                  ],
-                  selected: {_unit},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => setState(() => _unit = s.first),
-                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                ),
               ],
             ),
-            const SizedBox(height: 10),
-            SegmentedButton<_TrendRange>(
-              segments: _TrendRange.values.map((r) => ButtonSegment(value: r, label: Text(r.label))).toList(),
-              selected: {_range},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _range = s.first),
+            const SizedBox(height: 12),
+            _ToggleBar<_TrendUnit>(
+              value: _unit,
+              options: const {_TrendUnit.kwh: 'Units', _TrendUnit.inr: 'Money'},
+              onChanged: (v) => setState(() => _unit = v),
             ),
             const SizedBox(height: 16),
             trendAsync.when(
               data: (trend) => _buildBody(trend),
-              loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator())),
+              loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
               error: (e, _) => Padding(padding: const EdgeInsets.all(8), child: Text(e.toString(), style: const TextStyle(color: AppColors.critical))),
             ),
           ],
@@ -113,33 +116,123 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
     final isInr = _unit == _TrendUnit.inr;
     final spotSource = isInr ? trend.points.where((p) => p.inr != null).toList() : trend.points;
 
-    if (spotSource.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Text(
-          isInr ? 'No billing amount recorded yet for this period.' : 'No consumption data available for this period.',
-          style: const TextStyle(color: AppColors.cardMuted),
-        ),
-      );
+    final total = spotSource.fold<double>(0, (a, p) => a + (isInr ? p.inr! : p.kwh));
+    final avg = spotSource.isEmpty ? 0.0 : total / spotSource.length;
+    double? changePct;
+    if (spotSource.length >= 2) {
+      final last = isInr ? spotSource.last.inr! : spotSource.last.kwh;
+      final prevAvg = spotSource
+              .sublist(0, spotSource.length - 1)
+              .fold<double>(0, (a, p) => a + (isInr ? p.inr! : p.kwh)) /
+          (spotSource.length - 1);
+      if (prevAvg > 0) changePct = ((last - prevAvg) / prevAvg) * 100;
     }
 
-    final spots = [
-      for (var i = 0; i < spotSource.length; i++) FlSpot(i.toDouble(), (isInr ? spotSource[i].inr! : spotSource[i].kwh)),
-    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              isInr ? _currency.format(total) : '${total.toStringAsFixed(2)} Units',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(width: 10),
+            if (changePct != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (changePct >= 0 ? AppColors.warning : AppColors.success).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(changePct >= 0 ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: changePct >= 0 ? AppColors.warning : AppColors.success),
+                    const SizedBox(width: 2),
+                    Text('${changePct.abs().toStringAsFixed(1)}%',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: changePct >= 0 ? AppColors.warning : AppColors.success)),
+                  ],
+                ),
+              ),
+            const Spacer(),
+            _ToggleBar<_TrendRange>(
+              value: _range,
+              options: {for (final r in _TrendRange.values) r: r.label},
+              onChanged: (v) => setState(() => _range = v),
+              compact: true,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (spotSource.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              isInr ? 'No billing amount recorded yet for this period.' : 'No consumption data available for this period.',
+              style: const TextStyle(color: AppColors.cardMuted),
+            ),
+          )
+        else ...[
+          _buildChart(spotSource, isInr, avg),
+          const SizedBox(height: 16),
+          _buildMinMax(trend, isInr),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildMinMax(TrendResponse trend, bool isInr) {
     final maxPoint = isInr ? trend.maxInr : trend.maxKwh;
     final minPoint = isInr ? trend.minInr : trend.minKwh;
-    String formatValue(double v) => isInr ? _currency.format(v) : '${v.toStringAsFixed(2)} kWh';
+    if (maxPoint == null && minPoint == null) return const SizedBox.shrink();
     final dateFormat = _range == _TrendRange.today ? DateFormat.Hm() : DateFormat.MMMd();
+    String formatValue(double v) => isInr ? _currency.format(v) : '${v.toStringAsFixed(2)} kWh';
+    return Row(
+      children: [
+        if (maxPoint != null)
+          Expanded(
+            child: StatTile(
+              label: 'Maximum',
+              value: formatValue(isInr ? maxPoint.inr! : maxPoint.kwh),
+              subtitle: dateFormat.format(maxPoint.atUtc.toLocal()),
+              icon: Icons.trending_up,
+            ),
+          ),
+        if (maxPoint != null && minPoint != null) const SizedBox(width: 12),
+        if (minPoint != null)
+          Expanded(
+            child: StatTile(
+              label: 'Minimum',
+              value: formatValue(isInr ? minPoint.inr! : minPoint.kwh),
+              subtitle: dateFormat.format(minPoint.atUtc.toLocal()),
+              icon: Icons.trending_down,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildChart(List<TrendPoint> spotSource, bool isInr, double avg) {
+    final dateFormat = _range == _TrendRange.today ? DateFormat.Hm() : DateFormat.MMMd();
+    final values = spotSource.map((p) => isInr ? p.inr! : p.kwh).toList();
+    final maxY = values.reduce((a, b) => a > b ? a : b) * 1.2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           height: 180,
-          child: LineChart(
-            LineChartData(
+          child: BarChart(
+            BarChartData(
+              maxY: maxY == 0 ? 1 : maxY,
               gridData: const FlGridData(show: true, drawVerticalLine: false),
               borderData: FlBorderData(show: false),
+              extraLinesData: ExtraLinesData(horizontalLines: [
+                HorizontalLine(y: avg, color: AppColors.cardMuted, strokeWidth: 1, dashArray: [6, 4]),
+              ]),
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -151,7 +244,7 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
                     getTitlesWidget: (value, meta) {
                       final i = value.toInt();
                       if (i < 0 || i >= spotSource.length) return const SizedBox.shrink();
-                      final step = (spotSource.length / 4).ceil().clamp(1, spotSource.length);
+                      final step = (spotSource.length / 6).ceil().clamp(1, spotSource.length);
                       if (i % step != 0) return const SizedBox.shrink();
                       return Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -161,44 +254,71 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
                   ),
                 ),
               ),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  color: AppColors.accent,
-                  barWidth: 2,
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(show: true, color: AppColors.accent.withValues(alpha: 0.08)),
-                ),
+              barGroups: [
+                for (var i = 0; i < spotSource.length; i++)
+                  BarChartGroupData(x: i, barRods: [
+                    BarChartRodData(toY: values[i], color: AppColors.accent, width: 8, borderRadius: BorderRadius.circular(3)),
+                  ]),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (maxPoint != null)
-              Expanded(
-                child: StatTile(
-                  label: 'Maximum',
-                  value: formatValue(isInr ? maxPoint.inr! : maxPoint.kwh),
-                  subtitle: dateFormat.format(maxPoint.atUtc.toLocal()),
-                  icon: Icons.trending_up,
-                ),
-              ),
-            if (maxPoint != null && minPoint != null) const SizedBox(width: 12),
-            if (minPoint != null)
-              Expanded(
-                child: StatTile(
-                  label: 'Minimum',
-                  value: formatValue(isInr ? minPoint.inr! : minPoint.kwh),
-                  subtitle: dateFormat.format(minPoint.atUtc.toLocal()),
-                  icon: Icons.trending_down,
-                ),
-              ),
+            Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            const Text('Consumption', style: TextStyle(fontSize: 11, color: AppColors.cardMuted)),
+            const SizedBox(width: 16),
+            Container(width: 14, height: 0, decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.cardMuted, width: 1)))),
+            const SizedBox(width: 6),
+            const Text('Average', style: TextStyle(fontSize: 11, color: AppColors.cardMuted)),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _ToggleBar<T> extends StatelessWidget {
+  final T value;
+  final Map<T, String> options;
+  final ValueChanged<T> onChanged;
+  final bool compact;
+  const _ToggleBar({required this.value, required this.options, required this.onChanged, this.compact = false, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: AppColors.scaffoldBg, borderRadius: BorderRadius.circular(compact ? 10 : 12)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: options.entries.map((e) {
+          final selected = e.key == value;
+          return InkWell(
+            borderRadius: BorderRadius.circular(compact ? 8 : 10),
+            onTap: () => onChanged(e.key),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 18, vertical: compact ? 6 : 9),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(compact ? 8 : 10),
+              ),
+              child: Text(
+                e.value,
+                style: TextStyle(
+                  fontSize: compact ? 11 : 13,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : AppColors.cardMuted,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

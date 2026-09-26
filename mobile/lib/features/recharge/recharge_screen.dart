@@ -1,7 +1,9 @@
 import 'dart:math';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
 import '../dashboard/dashboard_screen.dart';
@@ -95,11 +97,88 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
   @override
   Widget build(BuildContext context) {
     final txAsync = ref.watch(transactionsProvider);
+    final summaryAsync = ref.watch(summaryProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Recharge & Wallet')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          summaryAsync.when(
+            data: (s) => HeroGradientCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('WALLET BALANCE', style: TextStyle(fontSize: 12, letterSpacing: 1, color: Colors.white70)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
+                        child: Text(s.connectionType, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
+                        style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
+                      ),
+                      Expanded(
+                        child: txAsync.maybeWhen(
+                          data: (rows) {
+                            if (rows.length < 2) return const SizedBox.shrink();
+                            final ordered = rows.take(10).toList().reversed.toList();
+                            return SizedBox(
+                              height: 32,
+                              child: LineChart(LineChartData(
+                                gridData: const FlGridData(show: false),
+                                borderData: FlBorderData(show: false),
+                                titlesData: const FlTitlesData(show: false),
+                                lineTouchData: const LineTouchData(enabled: false),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: [for (var i = 0; i < ordered.length; i++) FlSpot(i.toDouble(), ordered[i].balanceAfter)],
+                                    isCurved: true,
+                                    color: Colors.white,
+                                    barWidth: 2,
+                                    dotData: const FlDotData(show: false),
+                                  ),
+                                ],
+                              )),
+                            );
+                          },
+                          orElse: () => const SizedBox.shrink(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (s.lastRechargeAmount != null) ...[
+                    const SizedBox(height: 10),
+                    Container(height: 1, color: Colors.white24),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.history, size: 16, color: Colors.white70),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Last Recharge: ${_currency.format(s.lastRechargeAmount)} on ${DateFormat.yMMMd().format(s.lastRechargeAtUtc!.toLocal())}',
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            loading: () => const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(color: Colors.white))),
+            error: (e, _) => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 20),
           Text('Select Amount', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(

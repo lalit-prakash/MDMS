@@ -13,6 +13,7 @@ import '../meter/meter_screen.dart';
 import '../services/services_screen.dart';
 import '../alerts/alerts_screen.dart';
 import '../consumption/consumption_trend_card.dart';
+import '../consumption/environmental_impact_card.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
@@ -295,6 +296,8 @@ class _HomeTab extends ConsumerWidget {
                 .toList(),
           ),
           const SizedBox(height: 8),
+          const EnvironmentalImpactCard(),
+          const SizedBox(height: 12),
           const ConsumptionTrendCard(),
           const SizedBox(height: 12),
           Consumer(
