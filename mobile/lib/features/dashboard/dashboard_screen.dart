@@ -7,6 +7,7 @@ import '../recharge/recharge_screen.dart';
 import '../consumption/consumption_screen.dart';
 import '../complaints/complaints_screen.dart';
 import '../profile/profile_screen.dart';
+import '../bills/bills_screen.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
@@ -113,6 +114,12 @@ class _HomeTab extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BillsScreen())),
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('Bills & Statements'),
           ),
           const SizedBox(height: 16),
           summaryAsync.maybeWhen(
