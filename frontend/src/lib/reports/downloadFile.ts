@@ -1,11 +1,12 @@
 import { getAccessToken } from "@/lib/session/tokenStore";
+import { tenantHeaders } from "@/lib/session/tenantStore";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5004";
 
 /** Fetches an authenticated file endpoint as a blob and triggers the browser save. */
 export async function downloadFile(path: string, filenameFallback: string): Promise<void> {
   const token = getAccessToken();
-  const res = await fetch(`${BASE_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+  const res = await fetch(`${BASE_URL}${path}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...tenantHeaders() } });
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
 
   const blob = await res.blob();

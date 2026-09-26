@@ -22,6 +22,30 @@ public class JwtTokenService
 
     public JwtTokenService(IOptions<JwtOptions> options) => _options = options.Value;
 
+    /// <summary>
+    /// Issues an access token for a Consumer (mobile app) session — not a <see cref="User"/> (staff
+    /// account). Carries the Customer id as the subject and a fixed "Consumer" role claim, so
+    /// existing [Authorize] endpoints accept it exactly like a staff token, while the mobile app's
+    /// own backend calls scope every query to this consumerId.
+    /// </summary>
+    public AccessToken CreateConsumerAccessToken(Guid customerId, string displayName, Guid tenantId)
+    {
+        var expiresAtUtc = DateTime.UtcNow.AddDays(30); // consumer app sessions are long-lived; refreshed via /consumer-auth/login again
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, customerId.ToString()),
+            new Claim("name", displayName),
+            new Claim(ClaimTypes.Role, "Consumer"),
+            new Claim("tenant", tenantId.ToString()),
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer, audience: _options.Audience, claims: claims, expires: expiresAtUtc, signingCredentials: credentials);
+        return new AccessToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
+    }
+
     public AccessToken CreateAccessToken(User user)
     {
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_options.AccessTokenMinutes);

@@ -51,6 +51,7 @@ import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined
 import { useThemeMode } from "@/lib/theme/ThemeModeContext";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { useAuth } from "@/lib/session/AuthContext";
+import { TenantSwitcher } from "@/components/TenantSwitcher";
 import { apiClient } from "@/lib/apiClient";
 import { Complaint } from "@/lib/complaints";
 import { RevenueProtectionLead } from "@/lib/revenueProtection";
@@ -478,6 +479,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           <Box sx={{ flex: 1 }} />
+
+          <TenantSwitcher />
 
           <Tooltip title={alertCount > 0 ? `${alertCount} open items` : "No open items"}>
             <IconButton sx={{ color: "var(--header-icon)" }}>

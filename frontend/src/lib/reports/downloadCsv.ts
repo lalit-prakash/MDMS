@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/session/tokenStore";
+import { tenantHeaders } from "@/lib/session/tenantStore";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5004";
 
@@ -12,7 +13,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5004"
 export async function downloadCsv(pathAndQuery: string, filenameFallback: string): Promise<void> {
   const token = getAccessToken();
   const res = await fetch(`${BASE_URL}${pathAndQuery}${pathAndQuery.includes("?") ? "&" : "?"}export=csv`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...tenantHeaders() },
   });
   if (!res.ok) throw new Error(`Export failed (${res.status})`);
 

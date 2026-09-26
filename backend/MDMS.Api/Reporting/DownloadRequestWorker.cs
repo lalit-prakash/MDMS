@@ -62,7 +62,7 @@ public class DownloadRequestWorker : BackgroundService
     {
         using var scope = _scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IMdmsDbContext>();
-        var stuck = await db.DownloadRequests.Where(r => r.Status == DownloadRequestStatus.Processing).ToListAsync(ct);
+        var stuck = await db.DownloadRequests.IgnoreQueryFilters().Where(r => r.Status == DownloadRequestStatus.Processing).ToListAsync(ct);
         foreach (var r in stuck) r.Fail("Interrupted by a server restart. Please request it again.");
         if (stuck.Count > 0) await db.SaveChangesAsync(ct);
     }
@@ -80,7 +80,7 @@ public class DownloadRequestWorker : BackgroundService
         using var scope = _scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IMdmsDbContext>();
 
-        var request = await db.DownloadRequests.Where(r => r.Status == DownloadRequestStatus.Pending)
+        var request = await db.DownloadRequests.IgnoreQueryFilters().Where(r => r.Status == DownloadRequestStatus.Pending)
             .OrderBy(r => r.CreatedAtUtc).FirstOrDefaultAsync(ct);
         if (request is null) return false;
 
@@ -89,12 +89,15 @@ public class DownloadRequestWorker : BackgroundService
 
         try
         {
-            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, ct)
+            var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == request.UserId, ct)
                 ?? throw new InvalidOperationException("Requesting user no longer exists.");
             var baseUrl = BaseUrl() ?? throw new InvalidOperationException("Cannot determine this server's address.");
 
             using var http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromMinutes(5) };
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _tokens.CreateAccessToken(user).Value);
+            // Replay against the organisation the request was filed in (the requester's access to it
+            // is re-checked by the tenant middleware exactly as for any other call).
+            http.DefaultRequestHeaders.Add("X-Tenant-Id", request.TenantId.ToString());
 
             var path = request.RequestPath;
             var url = $"{path}{(path.Contains('?') ? "&" : "?")}export=csv";

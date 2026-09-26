@@ -11,7 +11,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.ToTable("Customers");
         builder.HasKey(c => c.Id);
         builder.Property(c => c.AccountNumber).IsRequired().HasMaxLength(64);
-        builder.HasIndex(c => c.AccountNumber).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.AccountNumber }).IsUnique();
         builder.Property(c => c.Name).IsRequired().HasMaxLength(256);
         builder.Property(c => c.RrNumber).HasMaxLength(64);
         builder.Property(c => c.MobileNumber).HasMaxLength(32);

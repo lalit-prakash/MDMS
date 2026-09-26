@@ -220,6 +220,68 @@ public class CustomersController : ControllerBase
         return Ok(new ListResult<ConsumerMasterRow>(pageRows, ReportPaging.BuildInfo(p, size, total), DateTime.UtcNow));
     }
 
+    // --------------------------------------------------------------------- Consumer app self-service
+
+    public record ConsumerSummaryResponse(
+        Guid Id, string AccountNumber, string Name, string? MeterNumber,
+        decimal? WalletBalance, bool? IsConnected);
+
+    /// <summary>The consumer-app dashboard's single summary call: consumer identity, currently
+    /// assigned meter's serial number, and prepaid wallet balance if one exists — real data only,
+    /// nulls where a fact genuinely isn't available yet (no prepaid account opened, no meter
+    /// assigned) rather than a fabricated placeholder.</summary>
+    [HttpGet("{id:guid}/summary")]
+    public async Task<IActionResult> GetConsumerSummary(Guid id, CancellationToken ct)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (customer is null) return NotFound();
+
+        var sp = await _db.ServicePoints.FirstOrDefaultAsync(x => x.CustomerId == id, ct);
+        string? meterNumber = null;
+        if (sp is not null)
+        {
+            var assignment = await _db.MeterAssignments
+                .Where(a => a.ServicePointId == sp.Id && a.EffectiveToUtc == null)
+                .OrderByDescending(a => a.EffectiveFromUtc)
+                .FirstOrDefaultAsync(ct);
+            if (assignment is not null)
+                meterNumber = (await _db.Meters.FirstOrDefaultAsync(m => m.Id == assignment.MeterId, ct))?.SerialNumber;
+        }
+
+        var account = await _db.PrepaidAccounts.FirstOrDefaultAsync(a => a.CustomerId == id, ct);
+
+        return Ok(new ConsumerSummaryResponse(customer.Id, customer.AccountNumber, customer.Name, meterNumber, account?.Balance, account?.IsConnected));
+    }
+
+    public record DailyConsumptionRow(DateOnly Date, decimal ConsumptionKwh);
+
+    /// <summary>Last <paramref name="days"/> of Daily Load Profile consumption for this consumer's
+    /// currently assigned meter, for the mobile app's Consumption module. Empty (not fabricated)
+    /// when no meter is assigned or no DP rows exist yet.</summary>
+    [HttpGet("{id:guid}/consumption/daily")]
+    public async Task<IActionResult> GetDailyConsumption(Guid id, [FromQuery] int days, CancellationToken ct)
+    {
+        var take = days is > 0 and <= 366 ? days : 30;
+        var sp = await _db.ServicePoints.FirstOrDefaultAsync(x => x.CustomerId == id, ct);
+        if (sp is null) return Ok(Array.Empty<DailyConsumptionRow>());
+
+        var assignment = await _db.MeterAssignments
+            .Where(a => a.ServicePointId == sp.Id && a.EffectiveToUtc == null)
+            .OrderByDescending(a => a.EffectiveFromUtc)
+            .FirstOrDefaultAsync(ct);
+        if (assignment is null) return Ok(Array.Empty<DailyConsumptionRow>());
+
+        var rows = await _db.DailyLoadProfiles
+            .Where(d => d.MeterId == assignment.MeterId)
+            .OrderByDescending(d => d.ProfileDate)
+            .Take(take)
+            .Select(d => new DailyConsumptionRow(d.ProfileDate, d.ConsumptionKwh))
+            .ToListAsync(ct);
+
+        rows.Reverse();
+        return Ok(rows);
+    }
+
     public record AddServicePointRequest(string Address, Guid? DistributionTransformerNodeId);
 
     [HttpPost("{id:guid}/service-points")]

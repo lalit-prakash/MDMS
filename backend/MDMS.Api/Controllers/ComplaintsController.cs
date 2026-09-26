@@ -24,11 +24,13 @@ public class ComplaintsController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] ComplaintStatus? status, [FromQuery] bool overdueOnly, CancellationToken ct)
+        [FromQuery] ComplaintStatus? status, [FromQuery] bool overdueOnly, [FromQuery] Guid? customerId, CancellationToken ct)
     {
         var query = _db.Complaints.AsQueryable();
         if (status.HasValue)
             query = query.Where(c => c.Status == status.Value);
+        if (customerId.HasValue)
+            query = query.Where(c => c.CustomerId == customerId.Value);
 
         var complaints = await query.OrderByDescending(c => c.CreatedAtUtc).Take(500).ToListAsync(ct);
         if (overdueOnly)

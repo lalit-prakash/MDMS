@@ -42,6 +42,8 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddScoped<MDMS.Api.Tenancy.HttpTenantContext>();
+builder.Services.AddScoped<MDMS.Application.Common.ITenantContext>(sp => sp.GetRequiredService<MDMS.Api.Tenancy.HttpTenantContext>());
 builder.Services.AddHostedService<MDMS.Api.Reporting.DownloadRequestWorker>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -80,6 +82,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseMiddleware<MDMS.Api.Tenancy.TenantResolutionMiddleware>();
 app.UseAuthorization();
 
 // Every controller requires an authenticated caller by default (fail-closed) — [AllowAnonymous]
