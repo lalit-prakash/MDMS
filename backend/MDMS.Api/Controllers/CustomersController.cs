@@ -282,6 +282,40 @@ public class CustomersController : ControllerBase
         return Ok(rows);
     }
 
+    public record BillingProfileRow(
+        DateOnly BillingDate, decimal CumulativeKwhImport, decimal CumulativeKvahImport,
+        decimal CumulativeKwhExport, decimal CumulativeKvahExport, decimal AveragePowerFactor,
+        decimal MaximumDemandKw, decimal MaximumDemandKva);
+
+    /// <summary>Billing Profile history for this consumer's currently assigned meter — the
+    /// mobile app's Bill/Statement module. This is the raw monthly commercial snapshot MDMS
+    /// records (see BillingProfile's own doc comment); there is no tariff-calculation engine in
+    /// this project to turn it into charges/amount-due, so no such figure is fabricated here —
+    /// a real billing/RMS system would consume this snapshot to produce the actual bill.</summary>
+    [HttpGet("{id:guid}/bills")]
+    public async Task<IActionResult> GetBills(Guid id, CancellationToken ct)
+    {
+        var sp = await _db.ServicePoints.FirstOrDefaultAsync(x => x.CustomerId == id, ct);
+        if (sp is null) return Ok(Array.Empty<BillingProfileRow>());
+
+        var assignment = await _db.MeterAssignments
+            .Where(a => a.ServicePointId == sp.Id && a.EffectiveToUtc == null)
+            .OrderByDescending(a => a.EffectiveFromUtc)
+            .FirstOrDefaultAsync(ct);
+        if (assignment is null) return Ok(Array.Empty<BillingProfileRow>());
+
+        var rows = await _db.BillingProfiles
+            .Where(b => b.MeterId == assignment.MeterId)
+            .OrderByDescending(b => b.BillingDate)
+            .Select(b => new BillingProfileRow(
+                b.BillingDate, b.CumulativeKwhImport, b.CumulativeKvahImport,
+                b.CumulativeKwhExport, b.CumulativeKvahExport, b.AveragePowerFactor,
+                b.MaximumDemandKw, b.MaximumDemandKva))
+            .ToListAsync(ct);
+
+        return Ok(rows);
+    }
+
     public record AddServicePointRequest(string Address, Guid? DistributionTransformerNodeId);
 
     [HttpPost("{id:guid}/service-points")]
