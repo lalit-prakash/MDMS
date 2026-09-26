@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
+import 'power_quality_screen.dart';
+import 'interval_profile_screen.dart';
 
 class MeterOverview {
   final String meterNumber;
@@ -96,6 +98,26 @@ class MeterScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IntervalProfileScreen())),
+                        icon: const Icon(Icons.table_chart_outlined),
+                        label: const Text('Interval Profile'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PowerQualityScreen())),
+                        icon: const Icon(Icons.health_and_safety_outlined),
+                        label: const Text('Power Quality'),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Text('Latest Available Profile', style: Theme.of(context).textTheme.titleMedium),
