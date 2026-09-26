@@ -115,18 +115,19 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: AppColors.accent, size: 20),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.cardMuted)),
+            Icon(icon, color: AppColors.accent, size: 18),
+            const SizedBox(height: 6),
+            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.cardMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
-              Text(subtitle!, style: TextStyle(fontSize: 11, color: subtitleColor ?? AppColors.cardMuted)),
+              Text(subtitle!, style: TextStyle(fontSize: 10, color: subtitleColor ?? AppColors.cardMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ],
         ),

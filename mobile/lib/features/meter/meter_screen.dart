@@ -106,7 +106,7 @@ class MeterScreen extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 1.5,
+                  childAspectRatio: 1.3,
                   children: [
                     StatTile(label: 'Voltage', value: hasLatest ? '${m.voltage!.toStringAsFixed(1)} V' : '—', icon: Icons.bolt_outlined),
                     StatTile(label: 'Current', value: hasLatest ? '${m.current!.toStringAsFixed(2)} A' : '—', icon: Icons.flash_on_outlined),
