@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_settings.dart';
 import '../../core/session.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../settings/settings_screen.dart';
+import 'linked_accounts_screen.dart';
 
-/// Consumer identity (real data via /customers/{id}/summary) and sign-out. Editable
-/// profile/notification-preference fields from the full spec are not implemented — there is no
-/// backend endpoint yet for a consumer to update their own mobile/email.
+/// Consumer identity (real data via /customers/{id}/summary), linked accounts/organisations,
+/// settings, and sign-out.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -13,15 +16,24 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(summaryProvider);
     final session = ref.watch(sessionProvider);
+    final settings = ref.watch(appSettingsProvider);
+    final linkedCount = ref.watch(sessionListProvider).length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          CircleAvatar(radius: 32, child: Text(session?.name.substring(0, 1) ?? '?', style: const TextStyle(fontSize: 28))),
+          Center(
+            child: CircleAvatar(
+              radius: 32,
+              backgroundImage: settings.profilePhotoPath != null ? FileImage(File(settings.profilePhotoPath!)) : null,
+              child: settings.profilePhotoPath == null ? Text(session?.name.substring(0, 1) ?? '?', style: const TextStyle(fontSize: 28)) : null,
+            ),
+          ),
           const SizedBox(height: 12),
           Center(child: Text(session?.name ?? '', style: Theme.of(context).textTheme.titleLarge)),
+          Center(child: Text(session?.organisationName ?? '', style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 24),
           Card(
             child: Column(
@@ -34,12 +46,40 @@ class ProfileScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                  title: const Text('Add Account'),
+                  subtitle: Text('Link another connection ($linkedCount linked)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LinkedAccountsScreen())),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.corporate_fare_outlined),
+                  title: const Text('Add Organisation'),
+                  subtitle: const Text('Link an account from another organisation'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LinkedAccountsScreen())),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('Settings'),
+                  subtitle: const Text('Theme, notifications, profile photo'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Card(
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onTap: () => ref.read(sessionProvider.notifier).signOut(),
+              onTap: () => ref.read(sessionListProvider.notifier).signOut(),
             ),
           ),
         ],

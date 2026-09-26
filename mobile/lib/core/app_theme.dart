@@ -24,6 +24,50 @@ ThemeData buildAppTheme() {
     fontFamily: 'Roboto',
   );
 
+  return _applyShared(base);
+}
+
+/// Dark variant — same card/button language, seeded for a dark scaffold instead of the light
+/// lavender one. Applied when the user picks Dark (or System resolves to dark) in Settings.
+ThemeData buildAppDarkTheme() {
+  final base = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorSchemeSeed: AppColors.heroGradientEnd,
+    scaffoldBackgroundColor: const Color(0xFF121218),
+    fontFamily: 'Roboto',
+  );
+  return base.copyWith(
+    appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF121218), foregroundColor: Colors.white, elevation: 0, centerTitle: false),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: const Color(0xFF1E1E27),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: const EdgeInsets.only(bottom: 12),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: const Color(0xFF1E1E27),
+      indicatorColor: AppColors.heroGradientEnd.withValues(alpha: 0.2),
+      elevation: 3,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: const Color(0xFF1E1E27),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.heroGradientEnd,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    ),
+  );
+}
+
+ThemeData _applyShared(ThemeData base) {
+
   return base.copyWith(
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.scaffoldBg,

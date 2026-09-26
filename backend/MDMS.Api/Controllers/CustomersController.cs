@@ -815,10 +815,30 @@ public class CustomersController : ControllerBase
     }
 
     public record ConsumptionTrendPoint(DateTime AtUtc, decimal Kwh, decimal? Inr);
+
+    /// <summary>
+    /// A derived "energy saved vs. not having used that power" impact estimate, not a measured
+    /// fact -- built the same honest way as the Home dashboard's Energy Saving Tip: real inputs
+    /// (TotalKwh from Load Survey/Daily Load Profile, TotalPowerOnHours summed from the meter's
+    /// own Instantaneous Profile PowerOnDurationMinutes over the same window), run through two
+    /// published approximations (see the constants below), never invented numbers. Presented to
+    /// the consumer as an estimate, matching the reference spec's own rule against overclaiming.
+    /// </summary>
+    public record EnvironmentalImpactSummary(decimal TotalKwh, decimal TotalPowerOnHours, decimal Co2Kg, decimal TreesSaved);
+
     public record ConsumptionTrendResponse(
         string Range, IReadOnlyList<ConsumptionTrendPoint> Points,
         ConsumptionTrendPoint? MaxKwhPoint, ConsumptionTrendPoint? MinKwhPoint,
-        ConsumptionTrendPoint? MaxInrPoint, ConsumptionTrendPoint? MinInrPoint);
+        ConsumptionTrendPoint? MaxInrPoint, ConsumptionTrendPoint? MinInrPoint,
+        EnvironmentalImpactSummary Impact);
+
+    /// <summary>India CEA grid-average emission factor (kg CO2 per kWh) -- a widely cited published
+    /// approximation, not this project's own measurement.</summary>
+    private const decimal Co2KgPerKwh = 0.716m;
+
+    /// <summary>A commonly cited rough equivalence (one mature tree absorbs ~21 kg CO2/year) used
+    /// only to turn a CO2 figure into a relatable "trees" comparison -- not a precise offset calculation.</summary>
+    private const decimal Co2KgAbsorbedPerTreePerYear = 21m;
 
     /// <summary>
     /// Consumption trend for the Home dashboard: Today (30-min Load Survey intervals) or 7/30
@@ -832,7 +852,7 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> GetConsumptionTrend(Guid id, [FromQuery] string range, CancellationToken ct)
     {
         var meterId = await CurrentMeterIdAsync(id, ct);
-        if (meterId is null) return Ok(new ConsumptionTrendResponse(range, [], null, null, null, null));
+        if (meterId is null) return Ok(new ConsumptionTrendResponse(range, [], null, null, null, null, new EnvironmentalImpactSummary(0, 0, 0, 0)));
 
         var account = await _db.PrepaidAccounts.FirstOrDefaultAsync(a => a.CustomerId == id, ct);
         var dailyDebits = account is null
@@ -848,11 +868,12 @@ public class CustomersController : ControllerBase
         }
 
         List<ConsumptionTrendPoint> points;
+        DateTime windowStartUtc;
         if (range == "today")
         {
-            var since = DateTime.UtcNow.AddDays(-1);
+            windowStartUtc = DateTime.UtcNow.AddDays(-1);
             var rows = await _db.LoadSurveyIntervals
-                .Where(i => i.MeterId == meterId.Value && i.IntervalEndUtc >= since)
+                .Where(i => i.MeterId == meterId.Value && i.IntervalEndUtc >= windowStartUtc)
                 .OrderBy(i => i.IntervalEndUtc)
                 .ToListAsync(ct);
             points = rows.Select(i => new ConsumptionTrendPoint(i.IntervalEndUtc, i.ConsumptionKwh, InrFor(DateOnly.FromDateTime(i.IntervalEndUtc)))).ToList();
@@ -861,6 +882,7 @@ public class CustomersController : ControllerBase
         {
             var days = range == "30days" ? 30 : 7;
             var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-days);
+            windowStartUtc = DateTime.SpecifyKind(since.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             var rows = await _db.DailyLoadProfiles
                 .Where(d => d.MeterId == meterId.Value && d.ProfileDate >= since)
                 .OrderBy(d => d.ProfileDate)
@@ -874,7 +896,16 @@ public class CustomersController : ControllerBase
         ConsumptionTrendPoint? maxInr = withInr.Count == 0 ? null : withInr.MaxBy(p => p.Inr!.Value);
         ConsumptionTrendPoint? minInr = withInr.Count == 0 ? null : withInr.MinBy(p => p.Inr!.Value);
 
-        return Ok(new ConsumptionTrendResponse(range, points, maxKwh, minKwh, maxInr, minInr));
+        var totalKwh = points.Sum(p => p.Kwh);
+        var totalPowerOnMinutes = await _db.InstantaneousProfiles
+            .Where(i => i.MeterId == meterId.Value && i.MeterTimeUtc >= windowStartUtc)
+            .SumAsync(i => (int?)i.PowerOnDurationMinutes, ct) ?? 0;
+        var totalPowerOnHours = totalPowerOnMinutes / 60m;
+        var co2Kg = totalKwh * Co2KgPerKwh;
+        var treesSaved = co2Kg / Co2KgAbsorbedPerTreePerYear;
+        var impact = new EnvironmentalImpactSummary(totalKwh, totalPowerOnHours, co2Kg, treesSaved);
+
+        return Ok(new ConsumptionTrendResponse(range, points, maxKwh, minKwh, maxInr, minInr, impact));
     }
 
     public record AddServicePointRequest(string Address, Guid? DistributionTransformerNodeId);
