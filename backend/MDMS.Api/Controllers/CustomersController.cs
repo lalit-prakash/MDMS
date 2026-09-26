@@ -223,7 +223,7 @@ public class CustomersController : ControllerBase
     // --------------------------------------------------------------------- Consumer app self-service
 
     public record ConsumerSummaryResponse(
-        Guid Id, string AccountNumber, string Name, string? MeterNumber,
+        Guid Id, string AccountNumber, string Name, Guid? MeterId, string? MeterNumber,
         decimal? WalletBalance, bool? IsConnected);
 
     /// <summary>The consumer-app dashboard's single summary call: consumer identity, currently
@@ -237,6 +237,7 @@ public class CustomersController : ControllerBase
         if (customer is null) return NotFound();
 
         var sp = await _db.ServicePoints.FirstOrDefaultAsync(x => x.CustomerId == id, ct);
+        Guid? meterId = null;
         string? meterNumber = null;
         if (sp is not null)
         {
@@ -245,12 +246,55 @@ public class CustomersController : ControllerBase
                 .OrderByDescending(a => a.EffectiveFromUtc)
                 .FirstOrDefaultAsync(ct);
             if (assignment is not null)
+            {
+                meterId = assignment.MeterId;
                 meterNumber = (await _db.Meters.FirstOrDefaultAsync(m => m.Id == assignment.MeterId, ct))?.SerialNumber;
+            }
         }
 
         var account = await _db.PrepaidAccounts.FirstOrDefaultAsync(a => a.CustomerId == id, ct);
 
-        return Ok(new ConsumerSummaryResponse(customer.Id, customer.AccountNumber, customer.Name, meterNumber, account?.Balance, account?.IsConnected));
+        return Ok(new ConsumerSummaryResponse(customer.Id, customer.AccountNumber, customer.Name, meterId, meterNumber, account?.Balance, account?.IsConnected));
+    }
+
+    public record MeterOverviewResponse(
+        string MeterNumber, string Phase, string Status,
+        DateTime? LatestProfileTimeUtc, decimal? Voltage, decimal? Current, decimal? PowerFactor,
+        decimal? Kwh, decimal? Kvah, decimal? Kw,
+        decimal? MaximumDemandKw, DateTime? MaximumDemandAtUtc, decimal? SanctionedLoadKw, string? LoadLimitState);
+
+    /// <summary>Meter Overview + latest Instantaneous Profile + Maximum Demand, for the mobile
+    /// app's Meter module. All from real backend records (Meter, InstantaneousProfile, the
+    /// consumer's own SanctionedLoadKw as the demand "limit" — this project has no separate MD
+    /// contract-demand field) — never a fabricated reading.</summary>
+    [HttpGet("{id:guid}/meter-overview")]
+    public async Task<IActionResult> GetMeterOverview(Guid id, CancellationToken ct)
+    {
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (customer is null) return NotFound();
+
+        var sp = await _db.ServicePoints.FirstOrDefaultAsync(x => x.CustomerId == id, ct);
+        if (sp is null) return NotFound("No meter currently assigned.");
+
+        var assignment = await _db.MeterAssignments
+            .Where(a => a.ServicePointId == sp.Id && a.EffectiveToUtc == null)
+            .OrderByDescending(a => a.EffectiveFromUtc)
+            .FirstOrDefaultAsync(ct);
+        if (assignment is null) return NotFound("No meter currently assigned.");
+
+        var meter = await _db.Meters.FirstOrDefaultAsync(m => m.Id == assignment.MeterId, ct);
+        if (meter is null) return NotFound();
+
+        var latest = await _db.InstantaneousProfiles
+            .Where(i => i.MeterId == meter.Id)
+            .OrderByDescending(i => i.MeterTimeUtc)
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new MeterOverviewResponse(
+            meter.SerialNumber, meter.Phase.ToString(), meter.Status.ToString(),
+            latest?.MeterTimeUtc, latest?.Voltage, latest?.PhaseCurrent, latest?.PowerFactor,
+            latest?.Kwh, latest?.Kvah, latest?.Kw,
+            latest?.MdKw, latest?.MdKwAtUtc, customer.SanctionedLoadKw, latest?.LoadLimitState.ToString()));
     }
 
     public record DailyConsumptionRow(DateOnly Date, decimal ConsumptionKwh);

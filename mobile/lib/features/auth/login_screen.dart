@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
 
@@ -68,21 +69,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.electric_bolt, size: 64, color: Colors.teal),
-                  const SizedBox(height: 8),
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [AppColors.heroGradientStart, AppColors.heroGradientEnd]),
+                    ),
+                    child: const Icon(Icons.electric_bolt, size: 44, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
                   Text('MDMS Consumer', style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
                   const SizedBox(height: 4),
-                  const Text('Sign in with your account number and registered mobile number', textAlign: TextAlign.center),
+                  const Text('Sign in with your account number and registered mobile number',
+                      textAlign: TextAlign.center, style: TextStyle(color: AppColors.cardMuted)),
                   const SizedBox(height: 32),
                   TextField(
                     controller: _accountController,
-                    decoration: const InputDecoration(labelText: 'Consumer / Account Number', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Consumer / Account Number', prefixIcon: Icon(Icons.badge_outlined)),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _mobileController,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'Registered Mobile Number', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Registered Mobile Number', prefixIcon: Icon(Icons.phone_outlined)),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
