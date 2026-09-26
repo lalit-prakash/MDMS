@@ -11,6 +11,7 @@ import '../profile/profile_screen.dart';
 import '../meter/meter_screen.dart';
 import '../services/services_screen.dart';
 import '../alerts/alerts_screen.dart';
+import '../consumption/consumption_trend_card.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
@@ -19,16 +20,22 @@ class ConsumerSummary {
   final String name;
   final String? meterId;
   final String? meterNumber;
+  final String connectionType;
   final double? walletBalance;
   final bool? isConnected;
+  final double? lastRechargeAmount;
+  final DateTime? lastRechargeAtUtc;
 
   ConsumerSummary({
     required this.accountNumber,
     required this.name,
     this.meterId,
     this.meterNumber,
+    required this.connectionType,
     this.walletBalance,
     this.isConnected,
+    this.lastRechargeAmount,
+    this.lastRechargeAtUtc,
   });
 
   factory ConsumerSummary.fromJson(Map<String, dynamic> j) => ConsumerSummary(
@@ -36,8 +43,11 @@ class ConsumerSummary {
         name: j['name'] as String,
         meterId: j['meterId'] as String?,
         meterNumber: j['meterNumber'] as String?,
+        connectionType: j['connectionType'] as String,
         walletBalance: (j['walletBalance'] as num?)?.toDouble(),
         isConnected: j['isConnected'] as bool?,
+        lastRechargeAmount: (j['lastRechargeAmount'] as num?)?.toDouble(),
+        lastRechargeAtUtc: j['lastRechargeAtUtc'] != null ? DateTime.parse(j['lastRechargeAtUtc'] as String) : null,
       );
 }
 
@@ -153,15 +163,40 @@ class _HomeTab extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('WALLET BALANCE', style: TextStyle(fontSize: 12, letterSpacing: 1, color: Colors.white70)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('WALLET BALANCE', style: TextStyle(fontSize: 12, letterSpacing: 1, color: Colors.white70)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
+                        child: Text(s.connectionType, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
                   ),
                   if (s.isConnected == false) ...[
                     const SizedBox(height: 6),
                     const Text('Connection currently disconnected', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+                  ],
+                  if (s.lastRechargeAmount != null) ...[
+                    const SizedBox(height: 10),
+                    Container(height: 1, color: Colors.white24),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.history, size: 16, color: Colors.white70),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Last Recharge: ${_currency.format(s.lastRechargeAmount)} on ${DateFormat.yMMMd().format(s.lastRechargeAtUtc!.toLocal())}',
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
                   ],
                   const SizedBox(height: 16),
                   SizedBox(
@@ -242,18 +277,7 @@ class _HomeTab extends ConsumerWidget {
                 .toList(),
           ),
           const SizedBox(height: 8),
-          summaryAsync.maybeWhen(
-            data: (s) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.electric_meter_outlined),
-                title: const Text('Meter Number'),
-                subtitle: Text(s.meterNumber ?? 'No meter currently assigned'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MeterScreen())),
-              ),
-            ),
-            orElse: () => const SizedBox.shrink(),
-          ),
+          const ConsumptionTrendCard(),
           const SizedBox(height: 12),
           consumptionAsync.maybeWhen(
             data: (rows) {
