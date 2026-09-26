@@ -49,6 +49,8 @@ public class MdmsDbContext : DbContext, IMdmsDbContext
     public DbSet<SavedFilter> SavedFilters => Set<SavedFilter>();
     public DbSet<DownloadRequest> DownloadRequests => Set<DownloadRequest>();
     public DbSet<UserTenantAccess> UserTenantAccesses => Set<UserTenantAccess>();
+    public DbSet<MeterTestingRequest> MeterTestingRequests => Set<MeterTestingRequest>();
+    public DbSet<ServiceRequest> ServiceRequests => Set<ServiceRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

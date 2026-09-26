@@ -39,6 +39,8 @@ public interface IMdmsDbContext
     DbSet<SavedFilter> SavedFilters { get; }
     DbSet<DownloadRequest> DownloadRequests { get; }
     DbSet<UserTenantAccess> UserTenantAccesses { get; }
+    DbSet<MeterTestingRequest> MeterTestingRequests { get; }
+    DbSet<ServiceRequest> ServiceRequests { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
