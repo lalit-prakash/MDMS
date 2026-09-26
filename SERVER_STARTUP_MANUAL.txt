@@ -102,7 +102,97 @@ Already-created account from this session (if the database hasn't been reset):
     Role:     Admin
 
 
-4. STOPPING EVERYTHING
+4. MOBILE APP (Flutter, Android)
+----------------------------------
+The mobile/ folder is the consumer Flutter app. It talks to the same backend
+API from step 1 — no separate server, but it does need the backend reachable
+from the phone.
+
+ONE-TIME SETUP (Flutter + Android SDK)
+This machine did not have Flutter or a full Android SDK installed, so this
+session set both up from scratch under your user profile (not Program Files,
+so no admin rights were needed):
+
+  Flutter SDK:  C:\Users\lalit\flutter          (cloned from the Flutter GitHub repo, stable channel)
+  Android SDK:  C:\Users\lalit\Android\Sdk      (cmdline-tools + platform-tools + platforms
+                                                   34/35/36 + build-tools installed via sdkmanager)
+
+Neither is on PATH permanently yet. Every command below assumes you add them
+to PATH for that terminal session first:
+
+    (PowerShell)
+    $env:PATH = "C:\Users\lalit\flutter\bin;C:\Users\lalit\Android\Sdk\platform-tools;$env:PATH"
+
+If you want this permanent, add those two paths to your user PATH environment
+variable via Windows Settings -> Environment Variables, then restart your
+terminal.
+
+Verify the toolchain:
+    flutter doctor -v
+  It's fine if "Visual Studio" and "Chrome" checks show issues — this project
+  only targets Android. The line to watch for is:
+    [√] Android toolchain - develop for Android devices (Android SDK version ...)
+
+CONNECT YOUR PHONE
+  1. On the phone: Settings -> About phone -> tap "Build number" 7 times to
+     enable Developer options, then Settings -> Developer options -> turn on
+     "USB debugging".
+  2. Plug the phone into this PC via USB.
+  3. Run:  adb devices
+     The phone should show as "device" (not "unauthorized" — if it shows
+     unauthorized, unlock the phone screen and tap Allow on the popup; if no
+     popup appears, run `adb kill-server` then `adb devices` again to force a
+     fresh pairing prompt).
+
+REACH THE BACKEND FROM THE PHONE
+  The app is hardcoded to call http://localhost:5004 (see
+  mobile/lib/core/api_client.dart). For a real device connected over USB,
+  "localhost" only resolves correctly if you forward the phone's localhost
+  port to this PC's:
+
+      adb reverse tcp:5004 tcp:5004
+
+  Re-run this after every reboot/reconnect (it doesn't persist). Skip this
+  step entirely if you're using an emulator instead of a real device —
+  Android emulators already reach the host machine at 10.0.2.2, which the
+  app's network security config also allows.
+
+BUILD AND INSTALL THE APP
+    cd C:\Users\lalit\OneDrive\Desktop\MDMS\mdms_repo\mobile
+    flutter pub get                     (only needed after pulling dependency changes)
+    flutter build apk --debug
+    adb install -r build\app\outputs\flutter-apk\app-debug.apk
+    adb shell am start -n com.mdms.mdms_consumer/.MainActivity
+
+Or, for live-reload development instead of a one-off install:
+    flutter run                         (deploys + hot-reloads on the connected device)
+
+SIGNING IN (mobile app)
+  The mobile app does NOT use the same login as the web frontend — it signs
+  in a consumer by Account Number + their registered mobile number (see
+  ConsumerAuthController; there's no SMS/OTP gateway in this project, so this
+  is the real substitute, not a fake OTP flow). A consumer's mobile number
+  must already be set via master-data (Customer.MobileNumber) before they can
+  sign in.
+
+  Seeded test account left set up on this database:
+      Account Number:  C-SEED-001
+      Mobile Number:   9998887771
+
+  "Recharge without logging in" on the Login screen (guest recharge) uses the
+  same account-number + mobile check, no session required.
+
+DISK SPACE
+  Flutter/Gradle builds are large. This machine's C: drive ran completely
+  out of space mid-build during this session. If `flutter build apk` fails
+  with "There is not enough space on the disk":
+      dotnet nuget locals all --clear
+      npm cache clean --force
+  freed several GB last time. Check free space first:
+      (Get-PSDrive C).Free / 1GB
+
+
+5. STOPPING EVERYTHING
 ------------------------
 Press Ctrl+C in each terminal window (backend and frontend separately).
 
@@ -115,7 +205,7 @@ stop it first. In PowerShell:
 Then re-run step 1.
 
 
-5. COMMON PROBLEMS
+6. COMMON PROBLEMS
 --------------------
 "Port 5004 already in use"
   -> Another MDMS.Api process is still running. See step 4 above.
@@ -163,6 +253,22 @@ Login says "No MDMS user account found with that username"
 "This account already has a password set. Use Sign in instead."
   -> You already claimed this account previously; use the normal Sign In
      form instead of "Claim your account".
+
+adb shows the phone as "unauthorized"
+  -> Unlock the phone (the trust dialog only shows on an unlocked screen),
+     then run `adb kill-server` followed by `adb devices` to force a fresh
+     pairing dialog, and tap Allow (tick "Always allow from this computer").
+
+App installs but every screen shows "No internet connection"
+  -> You likely skipped `adb reverse tcp:5004 tcp:5004` (see section 4), or
+     the backend (step 1) isn't running. This forwarding does not persist
+     across reboots/reconnects — re-run it each session.
+
+`adb install` fails with "INSTALL_FAILED_USER_RESTRICTED: Install canceled
+by user"
+  -> Android showed an install-confirmation popup on the phone and it was
+     dismissed. Check the phone and tap Install, then re-run the adb install
+     command.
 
 Stale-looking frontend after pulling new code / switching branches
   -> Stop the frontend (Ctrl+C), delete the .next folder, then `npm run dev`
