@@ -52,7 +52,7 @@ public class AuthController : ControllerBase
         if (request.Password.Length < 8)
             return BadRequest("Password must be at least 8 characters.");
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username, ct);
+        var user = await _db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Username == request.Username, ct);
         if (user is null)
             return NotFound("No MDMS user account found with that username.");
         if (user.PasswordHash is not null)
@@ -68,7 +68,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == request.Username, ct);
+        var user = await _db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Username == request.Username, ct);
         if (user is null || user.PasswordHash is null || !PasswordHasher.Verify(user.PasswordHash, request.Password))
         {
             // Same message for "no such user" and "wrong password" — distinguishing them lets an
@@ -94,7 +94,7 @@ public class AuthController : ControllerBase
             return Unauthorized("Refresh token is invalid or expired.");
         }
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == existing.UserId, ct);
+        var user = await _db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == existing.UserId, ct);
         if (user is null)
         {
             Response.Cookies.Delete(RefreshCookieName);

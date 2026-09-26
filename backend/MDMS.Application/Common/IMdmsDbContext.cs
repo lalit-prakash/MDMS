@@ -38,6 +38,7 @@ public interface IMdmsDbContext
     DbSet<WalletTransaction> WalletTransactions { get; }
     DbSet<SavedFilter> SavedFilters { get; }
     DbSet<DownloadRequest> DownloadRequests { get; }
+    DbSet<UserTenantAccess> UserTenantAccesses { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -9,7 +9,7 @@ namespace MDMS.Domain.Entities;
 /// called on the old row and a new row is inserted, so a stolen-and-replayed old token is
 /// detectable (its row is already revoked).
 /// </summary>
-public class RefreshToken : Entity
+public class RefreshToken : Entity, ITenantExempt
 {
     public Guid UserId { get; private set; }
     public string TokenHash { get; private set; } = default!;

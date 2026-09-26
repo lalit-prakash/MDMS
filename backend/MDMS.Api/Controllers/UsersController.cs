@@ -56,6 +56,10 @@ public class UsersController : ControllerBase
                 return NotFound($"Org unit {orgUnitId} not found.");
         }
 
+        // Login resolves a user by username across organisations, so a username must be unique globally.
+        if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Username == request.Username.Trim(), ct))
+            return Conflict($"Username '{request.Username}' is already taken.");
+
         User user;
         try
         {

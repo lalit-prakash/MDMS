@@ -228,6 +228,106 @@ function OrgUnitsSection() {
   );
 }
 
+interface TenantRow {
+  id: string;
+  code: string;
+  name: string;
+  isCurrent: boolean;
+  isHome: boolean;
+}
+
+function OrganisationsSection() {
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [grantTenantId, setGrantTenantId] = useState("");
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const query = useQuery({
+    queryKey: ["tenants", "mine"],
+    queryFn: () => apiClient.get<TenantRow[]>("/api/v1/tenants/mine"),
+  });
+
+  const create = useMutation({
+    mutationFn: () => apiClient.post("/api/v1/tenants", { code, name }),
+    onSuccess: () => {
+      setCode("");
+      setName("");
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+    },
+    onError: (err: unknown) => setError(err instanceof ApiError ? err.body || err.message : "Failed."),
+  });
+
+  const grant = useMutation({
+    mutationFn: () => apiClient.post<{ message: string }>(`/api/v1/tenants/${grantTenantId}/members`, { username }),
+    onSuccess: (r) => {
+      setUsername("");
+      setError(null);
+      setInfo(r.message);
+    },
+    onError: (err: unknown) => setError(err instanceof ApiError ? err.body || err.message : "Failed."),
+  });
+
+  return (
+    <Box>
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        Organisations
+      </Typography>
+      <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
+        <ErrorAlert error={error} onClose={() => setError(null)} />
+        {info && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setInfo(null)}>
+            {info}
+          </Alert>
+        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, flexWrap: "wrap", mb: 2 }}>
+          <TextField label="Code" size="small" value={code} onChange={(e) => setCode(e.target.value)} />
+          <TextField label="Name" size="small" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 220 }} />
+          <Button variant="contained" disabled={!code || !name} onClick={() => create.mutate()}>
+            Add Organisation
+          </Button>
+        </Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, flexWrap: "wrap" }}>
+          <TextField select label="Organisation" size="small" value={grantTenantId} onChange={(e) => setGrantTenantId(e.target.value)} sx={{ minWidth: 220 }}>
+            {query.data?.map((t) => (
+              <MenuItem key={t.id} value={t.id}>
+                {t.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField label="Username to grant access" size="small" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Button variant="outlined" disabled={!grantTenantId || !username} onClick={() => grant.mutate()}>
+            Grant Access
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined">
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Code</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Active</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {query.data?.map((t) => (
+              <TableRow key={t.id} hover>
+                <TableCell>{t.code}</TableCell>
+                <TableCell>{t.name}</TableCell>
+                <TableCell>{t.isCurrent ? "Yes" : ""}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
+    </Box>
+  );
+}
+
 export default function ConfigPage() {
   return (
     <Box>
@@ -241,6 +341,9 @@ export default function ConfigPage() {
         </Grid>
         <Grid size={12}>
           <OrgUnitsSection />
+        </Grid>
+        <Grid size={12}>
+          <OrganisationsSection />
         </Grid>
       </Grid>
     </Box>
