@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -93,8 +94,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 class _QuickAction {
   final String label;
   final IconData icon;
+  final Color color;
   final WidgetBuilder builder;
-  const _QuickAction(this.label, this.icon, this.builder);
+  const _QuickAction(this.label, this.icon, this.color, this.builder);
 }
 
 class _HomeTab extends ConsumerWidget {
@@ -107,10 +109,10 @@ class _HomeTab extends ConsumerWidget {
     final meterAsync = ref.watch(meterOverviewProvider);
 
     final actions = [
-      _QuickAction('Recharge', Icons.bolt, (_) => const RechargeScreen()),
-      _QuickAction('Consumption', Icons.show_chart, (_) => const ConsumptionScreen()),
-      _QuickAction('Meter', Icons.electric_meter_outlined, (_) => const MeterScreen()),
-      _QuickAction('Complaint', Icons.support_agent_outlined, (_) => const ComplaintsScreen()),
+      _QuickAction('Recharge', Icons.bolt, const Color(0xFF7C4DFF), (_) => const RechargeScreen()),
+      _QuickAction('Consumption', Icons.show_chart, const Color(0xFF00BFA5), (_) => const ConsumptionScreen()),
+      _QuickAction('Meter', Icons.electric_meter_outlined, const Color(0xFFFF8F00), (_) => const MeterScreen()),
+      _QuickAction('Complaint', Icons.support_agent_outlined, const Color(0xFFE91E63), (_) => const ComplaintsScreen()),
     ];
 
     return RefreshIndicator(
@@ -123,8 +125,17 @@ class _HomeTab extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              summaryAsync.maybeWhen(
+                data: (s) => CircleAvatar(
+                  radius: 22,
+                  backgroundColor: AppColors.accent,
+                  child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+                ),
+                orElse: () => const CircleAvatar(radius: 22, child: Icon(Icons.person)),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,9 +186,16 @@ class _HomeTab extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        s.walletBalance != null ? _currency.format(s.walletBalance) : 'No prepaid account',
+                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
+                      ),
+                      const Expanded(child: _BalanceSparkline()),
+                    ],
                   ),
                   if (s.isConnected == false) ...[
                     const SizedBox(height: 6),
@@ -268,7 +286,7 @@ class _HomeTab extends ConsumerWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(radius: 22, backgroundColor: AppColors.accent.withValues(alpha: 0.1), child: Icon(a.icon, color: AppColors.accent)),
+                          CircleAvatar(radius: 22, backgroundColor: a.color.withValues(alpha: 0.14), child: Icon(a.icon, color: a.color)),
                           const SizedBox(height: 6),
                           Text(a.label, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center),
                         ],
@@ -278,6 +296,65 @@ class _HomeTab extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           const ConsumptionTrendCard(),
+          const SizedBox(height: 12),
+          Consumer(
+            builder: (context, ref, _) {
+              final txAsync = ref.watch(transactionsProvider);
+              return txAsync.maybeWhen(
+                data: (rows) {
+                  if (rows.isEmpty) return const SizedBox.shrink();
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Recent Transactions', style: Theme.of(context).textTheme.titleMedium),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RechargeScreen())),
+                                child: const Text('View All'),
+                              ),
+                            ],
+                          ),
+                          for (final t in rows.take(3))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: (t.amount >= 0 ? AppColors.success : AppColors.critical).withValues(alpha: 0.12),
+                                    child: Icon(t.amount >= 0 ? Icons.add : Icons.remove, size: 16, color: t.amount >= 0 ? AppColors.success : AppColors.critical),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(t.type, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        Text(DateFormat.yMMMd().add_jm().format(t.createdAtUtc.toLocal()), style: const TextStyle(fontSize: 11, color: AppColors.cardMuted)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    '${t.amount >= 0 ? '+' : '-'}${_currency.format(t.amount.abs())}',
+                                    style: TextStyle(fontWeight: FontWeight.w700, color: t.amount >= 0 ? AppColors.success : AppColors.critical),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
+              );
+            },
+          ),
           const SizedBox(height: 12),
           consumptionAsync.maybeWhen(
             data: (rows) {
@@ -312,5 +389,46 @@ class _HomeTab extends ConsumerWidget {
     return pctDiff > 0
         ? "Your consumption today is ${pctDiff.toStringAsFixed(0)}% higher than your recent daily average."
         : "Your consumption today is ${pctDiff.abs().toStringAsFixed(0)}% lower than your recent daily average.";
+  }
+}
+
+/// A small inline trend of the wallet's own real balance history (from WalletTransaction.
+/// BalanceAfter, oldest-to-newest of the last 10 entries) — never a decorative random squiggle.
+class _BalanceSparkline extends ConsumerWidget {
+  const _BalanceSparkline();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final txAsync = ref.watch(transactionsProvider);
+    return txAsync.maybeWhen(
+      data: (rows) {
+        if (rows.length < 2) return const SizedBox.shrink();
+        final ordered = rows.take(10).toList().reversed.toList();
+        final spots = [for (var i = 0; i < ordered.length; i++) FlSpot(i.toDouble(), ordered[i].balanceAfter)];
+        return SizedBox(
+          height: 36,
+          width: 90,
+          child: LineChart(
+            LineChartData(
+              gridData: const FlGridData(show: false),
+              borderData: FlBorderData(show: false),
+              titlesData: const FlTitlesData(show: false),
+              lineTouchData: const LineTouchData(enabled: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  color: Colors.white,
+                  barWidth: 2,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(show: true, color: Colors.white.withValues(alpha: 0.15)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
   }
 }
