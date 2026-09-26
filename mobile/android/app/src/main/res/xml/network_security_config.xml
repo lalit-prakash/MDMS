@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Allows plain HTTP to localhost only (the backend, reached over `adb reverse tcp:5004
+     tcp:5004` for a USB-connected device). Every other host still requires HTTPS/TLS. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
