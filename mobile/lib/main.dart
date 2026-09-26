@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/app_theme.dart';
 import 'core/session.dart';
 import 'features/auth/login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -17,7 +18,7 @@ class MdmsConsumerApp extends ConsumerWidget {
     return MaterialApp(
       title: 'MDMS Consumer',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      theme: buildAppTheme(),
       home: session == null ? const LoginScreen() : const DashboardScreen(),
     );
   }
