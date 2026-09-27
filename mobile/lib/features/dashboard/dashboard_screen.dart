@@ -108,10 +108,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       drawer: const _AppDrawer(),
       body: SafeArea(child: tabs[_tab]),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.borderLight)),
+      bottomNavigationBar: Builder(builder: (context) {
+        final theme = Theme.of(context);
+        final unselected = theme.textTheme.bodySmall?.color ?? AppColors.textTertiary;
+        return DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color ?? theme.cardColor,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         child: SafeArea(
           top: false,
@@ -126,11 +129,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(i == _tab ? items[i].$2 : items[i].$1, size: 22, color: i == _tab ? AppColors.primary : AppColors.textTertiary),
+                          Icon(i == _tab ? items[i].$2 : items[i].$1, size: 22, color: i == _tab ? AppColors.primary : unselected),
                           const SizedBox(height: 3),
                           Text(
                             items[i].$3,
-                            style: TextStyle(fontSize: 11, fontWeight: i == _tab ? FontWeight.w600 : FontWeight.w500, color: i == _tab ? AppColors.primary : AppColors.textTertiary),
+                            style: TextStyle(fontSize: 11, fontWeight: i == _tab ? FontWeight.w600 : FontWeight.w500, color: i == _tab ? AppColors.primary : unselected),
                           ),
                         ],
                       ),
@@ -140,7 +143,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ),
-      ),
+        );
+      }),
     );
   }
 }
@@ -296,7 +300,7 @@ class _HomeTab extends ConsumerWidget {
                       error: (e, _) => Text(e.toString(), style: const TextStyle(color: Colors.red)),
                     ),
                     summaryAsync.maybeWhen(
-                      data: (s) => Text('Consumer No: ${s.accountNumber}', style: const TextStyle(color: AppColors.cardMuted, fontSize: 12)),
+                      data: (s) => Text('Consumer No: ${s.accountNumber}', style: Theme.of(context).textTheme.bodySmall),
                       orElse: () => const SizedBox.shrink(),
                     ),
                   ],
@@ -589,7 +593,7 @@ class _HomeTab extends ConsumerWidget {
                                 children: [
                                   Text('Important Alert', style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
                                   Text(top.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  Text(top.message, style: const TextStyle(fontSize: 12, color: AppColors.cardMuted), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  Text(top.message, style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
                                 ],
                               ),
                             ),
@@ -646,7 +650,7 @@ class _HomeTab extends ConsumerWidget {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(t.type, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                        Text(DateFormat.yMMMd().add_jm().format(t.createdAtUtc.toLocal()), style: const TextStyle(fontSize: 11, color: AppColors.cardMuted)),
+                                        Text(DateFormat.yMMMd().add_jm().format(t.createdAtUtc.toLocal()), style: Theme.of(context).textTheme.bodySmall),
                                       ],
                                     ),
                                   ),
