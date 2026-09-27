@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../recharge/guest_recharge_screen.dart';
 
 /// Login by Consumer Number + registered mobile number.
@@ -52,6 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             accountNumber: data['accountNumber'] as String,
             mobileNumber: _mobileController.text.trim(),
           ));
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const DashboardScreen()), (route) => false);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
