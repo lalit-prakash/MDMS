@@ -9,6 +9,7 @@ import '../consumption/consumption_screen.dart';
 import '../complaints/complaints_screen.dart';
 import '../profile/profile_screen.dart';
 import '../meter/meter_screen.dart';
+import '../meter_testing/meter_testing_screen.dart';
 import '../services/services_screen.dart';
 import '../alerts/alerts_screen.dart';
 import '../consumption/consumption_trend_card.dart';
@@ -57,6 +58,19 @@ final summaryProvider = FutureProvider.autoDispose<ConsumerSummary>((ref) async 
   final session = ref.watch(sessionProvider)!;
   final response = await apiCall(() => client.dio.get('/api/v1/customers/${session.consumerId}/summary'));
   return ConsumerSummary.fromJson(response.data as Map<String, dynamic>);
+});
+
+/// Today's real peak half-hour usage (expressed as an average kW over that interval, same
+/// derivation as the Consumption day-detail screen) -- distinct from Maximum Demand, which is the
+/// meter's own recorded MD for the current billing month.
+final _todayPeakProvider = FutureProvider.autoDispose<double?>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  final session = ref.watch(sessionProvider)!;
+  final today = DateTime.now();
+  final response = await apiCall(() => client.dio.get('/api/v1/customers/${session.consumerId}/consumption/day-detail',
+      queryParameters: {'date': '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}'}));
+  final data = response.data as Map<String, dynamic>;
+  return (data['peakKw'] as num?)?.toDouble();
 });
 
 /// Bottom navigation: Home / Consumption / Meter / Services / Profile — matching the reference
@@ -112,6 +126,7 @@ class _HomeTab extends ConsumerWidget {
       _QuickAction('Recharge', Icons.bolt, const Color(0xFF7C4DFF), (_) => const RechargeScreen()),
       _QuickAction('Consumption', Icons.show_chart, const Color(0xFF00BFA5), (_) => const ConsumptionScreen()),
       _QuickAction('Meter', Icons.electric_meter_outlined, const Color(0xFFFF8F00), (_) => const MeterScreen()),
+      _QuickAction('Meter Testing', Icons.fact_check_outlined, const Color(0xFF3F51B5), (_) => const MeterTestingScreen()),
       _QuickAction('Complaint', Icons.support_agent_outlined, const Color(0xFFE91E63), (_) => const ComplaintsScreen()),
     ];
 
@@ -194,21 +209,73 @@ class _HomeTab extends ConsumerWidget {
                     const SizedBox(height: 6),
                     const Text('Connection currently disconnected', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
                   ],
-                  if (s.lastRechargeAmount != null) ...[
-                    const SizedBox(height: 10),
-                    Container(height: 1, color: Colors.white24),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(Icons.history, size: 16, color: Colors.white70),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Last Recharge: ${_currency.format(s.lastRechargeAmount)} on ${DateFormat.yMMMd().format(s.lastRechargeAtUtc!.toLocal())}',
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ],
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final txAsync = ref.watch(transactionsProvider);
+                      return txAsync.maybeWhen(
+                        data: (rows) {
+                          if (rows.isEmpty || s.walletBalance == null) return const SizedBox.shrink();
+                          final debits = rows.where((t) => t.type == 'ConsumptionDebit').toList();
+                          double? estimatedDays;
+                          if (debits.length >= 2) {
+                            final recent = debits.take(7).toList();
+                            final avgDaily = recent.fold<double>(0, (a, t) => a + t.amount.abs()) / recent.length;
+                            if (avgDaily > 0) estimatedDays = s.walletBalance! / avgDaily;
+                          }
+                          final lastDeduction = debits.isNotEmpty ? debits.first : null;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (estimatedDays != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Text('≈ ${estimatedDays.toStringAsFixed(1)} days estimated balance', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                                    const SizedBox(width: 4),
+                                    Tooltip(
+                                      message: 'Estimated from your average daily consumption debit over the last ${debits.take(7).length} days.',
+                                      child: const Icon(Icons.info_outline, size: 13, color: Colors.white54),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (s.lastRechargeAmount != null || lastDeduction != null) ...[
+                                const SizedBox(height: 10),
+                                Container(height: 1, color: Colors.white24),
+                                const SizedBox(height: 10),
+                              ],
+                              if (s.lastRechargeAmount != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.arrow_downward, size: 14, color: Colors.white70),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Last Recharge: ${_currency.format(s.lastRechargeAmount)} on ${DateFormat.yMMMd().format(s.lastRechargeAtUtc!.toLocal())}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (lastDeduction != null)
+                                Row(
+                                  children: [
+                                    const Icon(Icons.arrow_upward, size: 14, color: Colors.white70),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Last Deduction: ${_currency.format(lastDeduction.amount.abs())} on ${DateFormat.yMMMd().format(lastDeduction.createdAtUtc.toLocal())}',
+                                      style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          );
+                        },
+                        orElse: () => const SizedBox.shrink(),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -249,18 +316,83 @@ class _HomeTab extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: meterAsync.when(
-                  data: (m) => StatTile(
-                    label: 'Maximum Demand',
-                    value: m?.maximumDemandKw != null ? '${m!.maximumDemandKw!.toStringAsFixed(2)} kW' : '—',
-                    subtitle: m?.sanctionedLoadKw != null ? 'Limit ${m!.sanctionedLoadKw!.toStringAsFixed(2)} kW' : null,
-                    icon: Icons.speed_outlined,
-                  ),
-                  loading: () => const StatTile(label: 'Maximum Demand', value: '...', icon: Icons.speed_outlined),
-                  error: (e, _) => const StatTile(label: 'Maximum Demand', value: '—', icon: Icons.speed_outlined),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final peakAsync = ref.watch(_todayPeakProvider);
+                    return peakAsync.when(
+                      data: (peak) => StatTile(label: "Today's Peak Usage", value: peak != null ? '${peak.toStringAsFixed(2)} kW' : '—', icon: Icons.bolt_outlined),
+                      loading: () => const StatTile(label: "Today's Peak Usage", value: '...', icon: Icons.bolt_outlined),
+                      error: (e, _) => const StatTile(label: "Today's Peak Usage", value: '—', icon: Icons.bolt_outlined),
+                    );
+                  },
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          meterAsync.maybeWhen(
+            data: (m) {
+              if (m?.maximumDemandKw == null || m?.sanctionedLoadKw == null || m!.sanctionedLoadKw! <= 0) return const SizedBox.shrink();
+              final ratio = (m.maximumDemandKw! / m.sanctionedLoadKw!).clamp(0.0, 1.5);
+              final breach = ratio > 1.0;
+              final warning = ratio > 0.9;
+              final barColor = breach ? AppColors.critical : (warning ? AppColors.warning : AppColors.success);
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.bar_chart, color: AppColors.accent, size: 18),
+                          const SizedBox(width: 8),
+                          const Expanded(child: Text('Maximum Demand (Current Month)', style: TextStyle(fontWeight: FontWeight.w600))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: barColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+                            child: Text('${(ratio * 100).toStringAsFixed(0)}%', style: TextStyle(color: barColor, fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('${m.maximumDemandKw!.toStringAsFixed(2)} kW / ${m.sanctionedLoadKw!.toStringAsFixed(2)} kW', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(value: ratio.clamp(0.0, 1.0), minHeight: 8, backgroundColor: AppColors.scaffoldBg, color: barColor),
+                      ),
+                      if (breach || warning) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 14, color: barColor),
+                            const SizedBox(width: 4),
+                            Text(breach ? 'Demand limit exceeded' : 'Approaching your demand limit', style: TextStyle(color: barColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 12),
+          meterAsync.maybeWhen(
+            data: (m) {
+              if (m == null) return const SizedBox.shrink();
+              final connected = m.status == 'Installed';
+              return Card(
+                child: ListTile(
+                  leading: Icon(Icons.sensors, color: connected ? AppColors.success : AppColors.critical),
+                  title: Text(connected ? 'Meter Connected' : 'Meter Communication Issue', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(m.latestProfileTimeUtc != null ? 'Last data received: ${DateFormat.yMMMd().add_jm().format(m.latestProfileTimeUtc!.toLocal())}' : 'No profile data received yet'),
+                ),
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
           ),
           const SizedBox(height: 20),
           Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium),
@@ -288,6 +420,48 @@ class _HomeTab extends ConsumerWidget {
                 .toList(),
           ),
           const SizedBox(height: 8),
+          Consumer(
+            builder: (context, ref, _) {
+              final alertsAsync = ref.watch(alertsProvider);
+              return alertsAsync.maybeWhen(
+                data: (rows) {
+                  final important = rows.where((a) => a.severity == 'Critical' || a.severity == 'High').toList();
+                  if (important.isEmpty) return const SizedBox.shrink();
+                  final top = important.first;
+                  final color = top.severity == 'Critical' ? AppColors.critical : AppColors.warning;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlertsScreen())),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          children: [
+                            CircleAvatar(radius: 18, backgroundColor: color.withValues(alpha: 0.16), child: Icon(Icons.notifications_active, color: color, size: 18)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Important Alert', style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+                                  Text(top.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Text(top.message, style: const TextStyle(fontSize: 12, color: AppColors.cardMuted), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: color),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
+              );
+            },
+          ),
           const EnvironmentalImpactCard(),
           const SizedBox(height: 12),
           const ConsumptionTrendCard(),
