@@ -156,14 +156,14 @@ class _ConsumptionScreenState extends ConsumerState<ConsumptionScreen> {
                     Expanded(
                       child: InkWell(
                         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DayDetailScreen(initialDate: peak.date))),
-                        child: StatTile(label: 'Highest Day', value: '${peak.kwh.toStringAsFixed(2)} kWh', subtitle: DateFormat.yMMMd().format(peak.date), icon: Icons.trending_up),
+                        child: StatTile(label: 'Highest Day', value: '${peak.kwh.toStringAsFixed(2)} kWh', subtitle: DateFormat.yMMMd().format(peak.date), icon: Icons.trending_up, iconColor: AppColors.warning),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: InkWell(
                         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DayDetailScreen(initialDate: lowest.date))),
-                        child: StatTile(label: 'Lowest Day', value: '${lowest.kwh.toStringAsFixed(2)} kWh', subtitle: DateFormat.yMMMd().format(lowest.date), icon: Icons.trending_down),
+                        child: StatTile(label: 'Lowest Day', value: '${lowest.kwh.toStringAsFixed(2)} kWh', subtitle: DateFormat.yMMMd().format(lowest.date), icon: Icons.trending_down, iconColor: AppColors.success),
                       ),
                     ),
                   ],
