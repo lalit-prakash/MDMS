@@ -7,9 +7,15 @@ import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
 import '../recharge/recharge_screen.dart';
+import '../recharge/transaction_history_screen.dart';
 import '../consumption/consumption_screen.dart';
 import '../complaints/complaints_screen.dart';
+import '../service_requests/service_requests_screen.dart';
 import '../profile/profile_screen.dart';
+import '../profile/linked_accounts_screen.dart';
+import '../settings/settings_screen.dart';
+import '../bills/bills_screen.dart';
+import '../auth/login_screen.dart';
 import '../meter/meter_screen.dart';
 import '../meter_testing/meter_testing_screen.dart';
 import '../services/services_screen.dart';
@@ -89,15 +95,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = [const _HomeTab(), const ConsumptionScreen(), const MeterScreen(), const ServicesScreen(), const ProfileScreen()];
+    final tabs = [const _HomeTab(), const ConsumptionScreen(), const RechargeScreen(), const ServicesScreen(), const ProfileScreen()];
     const items = [
       (Icons.home_outlined, Icons.home, 'Home'),
       (Icons.show_chart_outlined, Icons.show_chart, 'Consumption'),
-      (Icons.electric_meter_outlined, Icons.electric_meter, 'Meter'),
+      (Icons.bolt_outlined, Icons.bolt, 'Recharge'),
       (Icons.grid_view_outlined, Icons.grid_view, 'Services'),
       (Icons.person_outline, Icons.person, 'Profile'),
     ];
     return Scaffold(
+      drawer: const _AppDrawer(),
       body: SafeArea(child: tabs[_tab]),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
@@ -144,6 +151,91 @@ class _QuickAction {
   const _QuickAction(this.label, this.icon, this.color, this.builder);
 }
 
+/// Side navigation for everything not already on the bottom nav (Home/Consumption/Recharge/
+/// Services/Profile) -- Meter moved here since it no longer has a bottom-nav slot, alongside the
+/// other modules the bottom nav was never meant to hold (Bills, Alerts, Transaction History,
+/// Linked Accounts, Settings).
+class _AppDrawer extends ConsumerWidget {
+  const _AppDrawer();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(summaryProvider);
+    final session = ref.watch(sessionProvider);
+
+    Widget tile(IconData icon, String label, WidgetBuilder builder) => ListTile(
+          leading: Icon(icon, color: AppColors.primary),
+          title: Text(label),
+          onTap: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(MaterialPageRoute(builder: builder));
+          },
+        );
+
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.heroGradientStart, AppColors.heroGradientEnd]),
+            ),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(radius: 22, backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
+                  const SizedBox(height: 8),
+                  Text(session?.name ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                  summaryAsync.maybeWhen(
+                    data: (s) => Text('A/C: ${s.accountNumber}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          tile(Icons.electric_meter_outlined, 'Meter', (_) => const MeterScreen()),
+          tile(Icons.receipt_long_outlined, 'Bills & Statements', (_) => const BillsScreen()),
+          tile(Icons.history, 'Transaction History', (_) => const TransactionHistoryScreen()),
+          tile(Icons.notifications_outlined, 'Alerts & Notifications', (_) => const AlertsScreen()),
+          tile(Icons.account_balance_wallet_outlined, 'Linked Accounts', (_) => const LinkedAccountsScreen()),
+          const Divider(),
+          tile(Icons.support_agent_outlined, 'Complaints', (_) => const ComplaintsScreen()),
+          tile(Icons.assignment_outlined, 'Service Requests', (_) => const ServiceRequestsScreen()),
+          tile(Icons.fact_check_outlined, 'Meter Testing', (_) => const MeterTestingScreen()),
+          const Divider(),
+          tile(Icons.settings_outlined, 'Settings', (_) => const SettingsScreen()),
+          ListTile(
+            leading: const Icon(Icons.logout, color: AppColors.critical),
+            title: const Text('Logout', style: TextStyle(color: AppColors.critical)),
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Log out?'),
+                  content: const Text('You will need your account number and mobile number to sign in again.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                    TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Logout')),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              await ref.read(sessionListProvider.notifier).signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HomeTab extends ConsumerWidget {
   const _HomeTab();
 
@@ -172,6 +264,13 @@ class _HomeTab extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
+              const SizedBox(width: 4),
               Consumer(
                 builder: (context, ref, _) {
                   final photoPath = ref.watch(appSettingsProvider).profilePhotoPath;
@@ -524,7 +623,7 @@ class _HomeTab extends ConsumerWidget {
                             children: [
                               Text('Recent Transactions', style: Theme.of(context).textTheme.titleMedium),
                               TextButton(
-                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RechargeScreen())),
+                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TransactionHistoryScreen())),
                                 child: const Text('View All'),
                               ),
                             ],
