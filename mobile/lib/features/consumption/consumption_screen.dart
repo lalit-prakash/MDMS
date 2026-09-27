@@ -109,47 +109,89 @@ class _ConsumptionScreenState extends ConsumerState<ConsumptionScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text('Tap a bar to see that day\'s hourly breakdown.', style: TextStyle(fontSize: 11, color: AppColors.cardMuted)),
+                Text('Tap a bar to see that day\'s hourly breakdown.', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 220,
-                  child: BarChart(
-                    BarChartData(
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(getTooltipColor: (_) => AppColors.accent),
-                        touchCallback: (event, response) {
-                          if (!event.isInterestedForInteractions) return;
-                          final index = response?.spot?.touchedBarGroupIndex;
-                          if (index == null || index < 0 || index >= rows.length) return;
-                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => DayDetailScreen(initialDate: rows[index].date)));
-                        },
-                      ),
-                      barGroups: [
-                        for (var i = 0; i < rows.length; i++)
-                          BarChartGroupData(x: i, barRods: [BarChartRodData(toY: rows[i].kwh, color: AppColors.accent, width: days == 30 ? 5 : 14, borderRadius: BorderRadius.circular(3))])
-                      ],
-                      titlesData: FlTitlesData(
-                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 24,
-                            getTitlesWidget: (value, meta) {
-                              final i = value.toInt();
-                              final step = (rows.length / 6).ceil().clamp(1, rows.length);
-                              if (i < 0 || i >= rows.length || i % step != 0) return const SizedBox.shrink();
-                              return Padding(padding: const EdgeInsets.only(top: 4), child: Text(DateFormat.Md().format(rows[i].date), style: const TextStyle(fontSize: 10)));
+                Builder(builder: (context) {
+                  final maxVal = rows.map((r) => r.kwh).reduce((a, b) => a > b ? a : b);
+                  final maxY = maxVal <= 0 ? 1.0 : maxVal * 1.25;
+                  return Container(
+                    padding: const EdgeInsets.fromLTRB(4, 16, 12, 4),
+                    decoration: BoxDecoration(color: AppColors.scaffoldBg.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(16)),
+                    child: SizedBox(
+                      height: 220,
+                      child: BarChart(
+                        BarChartData(
+                          maxY: maxY,
+                          alignment: BarChartAlignment.spaceAround,
+                          barTouchData: BarTouchData(
+                            touchTooltipData: BarTouchTooltipData(
+                              getTooltipColor: (_) => AppColors.primary,
+                              getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+                                '${rod.toY.toStringAsFixed(2)} kWh\n${DateFormat.MMMd().format(rows[groupIndex].date)}',
+                                const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            touchCallback: (event, response) {
+                              if (!event.isInterestedForInteractions) return;
+                              final index = response?.spot?.touchedBarGroupIndex;
+                              if (index == null || index < 0 || index >= rows.length) return;
+                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => DayDetailScreen(initialDate: rows[index].date)));
                             },
                           ),
+                          barGroups: [
+                            for (var i = 0; i < rows.length; i++)
+                              BarChartGroupData(x: i, barRods: [
+                                BarChartRodData(
+                                  toY: rows[i].kwh,
+                                  width: days == 30 ? 6 : 16,
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(days == 30 ? 2 : 5)),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [AppColors.primary.withValues(alpha: 0.55), AppColors.primary],
+                                  ),
+                                ),
+                              ])
+                          ],
+                          titlesData: FlTitlesData(
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 34,
+                                interval: maxY / 4,
+                                getTitlesWidget: (value, meta) =>
+                                    Text(value.toStringAsFixed(0), style: const TextStyle(fontSize: 9, color: AppColors.textTertiary)),
+                              ),
+                            ),
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 24,
+                                getTitlesWidget: (value, meta) {
+                                  final i = value.toInt();
+                                  final step = (rows.length / 6).ceil().clamp(1, rows.length);
+                                  if (i < 0 || i >= rows.length || i % step != 0) return const SizedBox.shrink();
+                                  return Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(DateFormat.Md().format(rows[i].date), style: const TextStyle(fontSize: 9, color: AppColors.textTertiary)));
+                                },
+                              ),
+                            ),
+                          ),
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: maxY / 4,
+                            getDrawingHorizontalLine: (_) => FlLine(color: AppColors.textTertiary.withValues(alpha: 0.15), strokeWidth: 1),
+                          ),
+                          borderData: FlBorderData(show: false),
                         ),
                       ),
-                      gridData: const FlGridData(show: true, drawVerticalLine: false),
-                      borderData: FlBorderData(show: false),
                     ),
-                  ),
-                ),
+                  );
+                }),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -185,7 +227,7 @@ class _ConsumptionScreenState extends ConsumerState<ConsumptionScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(m.currentMonthLabel, style: const TextStyle(fontSize: 12, color: AppColors.cardMuted)),
+                                    Text(m.currentMonthLabel, style: Theme.of(context).textTheme.bodySmall),
                                     Text('${m.currentMonthKwh.toStringAsFixed(2)} kWh', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                                   ],
                                 ),
@@ -195,7 +237,7 @@ class _ConsumptionScreenState extends ConsumerState<ConsumptionScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(m.previousMonthLabel ?? '', style: const TextStyle(fontSize: 12, color: AppColors.cardMuted)),
+                                      Text(m.previousMonthLabel ?? '', style: Theme.of(context).textTheme.bodySmall),
                                       Text('${m.previousMonthKwh!.toStringAsFixed(2)} kWh', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                                     ],
                                   ),
@@ -267,15 +309,17 @@ class _RangeToggle extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(color: selected ? AppColors.accent : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-          child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : AppColors.cardMuted)),
+          decoration: BoxDecoration(color: selected ? AppColors.primary : Colors.transparent, borderRadius: BorderRadius.circular(8)),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: selected ? Colors.white : Theme.of(context).textTheme.bodySmall?.color)),
         ),
       );
     }
 
     return Container(
       padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: AppColors.scaffoldBg, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [seg(_TrendRange.days7, '7D'), seg(_TrendRange.days30, '30D')]),
     );
   }
@@ -325,7 +369,7 @@ class _StatCard extends StatelessWidget {
               Text(value, style: Theme.of(context).textTheme.titleLarge),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
-                Text(subtitle!, style: const TextStyle(fontSize: 11, color: AppColors.cardMuted)),
+                Text(subtitle!, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
               ],
             ],
           ),
