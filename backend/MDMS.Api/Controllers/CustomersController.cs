@@ -664,6 +664,105 @@ public class CustomersController : ControllerBase
 
     }
 
+    public record HourlyConsumptionPoint(int Hour, decimal Kwh);
+    public record IntervalConsumptionPoint(DateTime IntervalStartUtc, DateTime IntervalEndUtc, decimal Kwh, decimal? AverageVoltage, decimal? AverageCurrent);
+    public record DayConsumptionDetail(
+        DateOnly Date, decimal TotalKwh,
+        decimal? PeakKw, DateTime? PeakAtUtc,
+        decimal? LowestIntervalKwh, DateTime? LowestAtUtc,
+        decimal? AverageKw,
+        IReadOnlyList<HourlyConsumptionPoint> Hourly,
+        IReadOnlyList<IntervalConsumptionPoint> Intervals);
+
+    /// <summary>Drill-down for a single day: hourly totals and the raw 30-minute intervals it was
+    /// built from (real Load Survey rows -- this is the same data GetDailyConsumption's daily
+    /// total is summed from, never a separate fabricated series). "Peak Kw" is each interval's own
+    /// consumption expressed as an average kW over that half hour (ConsumptionKwh / 0.5h), since
+    /// this project's Load Survey doesn't carry an instantaneous kW reading -- an honest derived
+    /// figure, not the true instantaneous peak Instantaneous Profile would show at 15-minute
+    /// cadence. Empty (not fabricated) when no Load Survey rows exist for that date.</summary>
+    [HttpGet("{id:guid}/consumption/day-detail")]
+    public async Task<IActionResult> GetDayConsumptionDetail(Guid id, [FromQuery] DateOnly date, CancellationToken ct)
+    {
+        var meterId = await CurrentMeterIdAsync(id, ct);
+        if (meterId is null)
+            return Ok(new DayConsumptionDetail(date, 0, null, null, null, null, null, [], []));
+
+        var dayStartUtc = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var dayEndUtc = dayStartUtc.AddDays(1);
+        var rows = await _db.LoadSurveyIntervals
+            .Where(i => i.MeterId == meterId.Value && i.IntervalEndUtc > dayStartUtc && i.IntervalEndUtc <= dayEndUtc)
+            .OrderBy(i => i.IntervalEndUtc)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0)
+            return Ok(new DayConsumptionDetail(date, 0, null, null, null, null, null, [], []));
+
+        var intervals = rows.Select(r => new IntervalConsumptionPoint(r.IntervalStartUtc, r.IntervalEndUtc, r.ConsumptionKwh, r.AverageVoltage, r.AverageCurrent)).ToList();
+        var hourly = rows
+            .GroupBy(r => r.IntervalEndUtc.AddMinutes(-1).Hour)
+            .OrderBy(g => g.Key)
+            .Select(g => new HourlyConsumptionPoint(g.Key, g.Sum(r => r.ConsumptionKwh)))
+            .ToList();
+
+        var totalKwh = rows.Sum(r => r.ConsumptionKwh);
+        var peak = rows.MaxBy(r => r.ConsumptionKwh)!;
+        var lowest = rows.MinBy(r => r.ConsumptionKwh)!;
+        var averageKw = totalKwh / 24m;
+
+        return Ok(new DayConsumptionDetail(
+            date, totalKwh,
+            peak.ConsumptionKwh / 0.5m, peak.IntervalEndUtc,
+            lowest.ConsumptionKwh, lowest.IntervalEndUtc,
+            averageKw, hourly, intervals));
+    }
+
+    public record MonthlyConsumptionComparison(
+        string CurrentMonthLabel, decimal CurrentMonthKwh,
+        string? PreviousMonthLabel, decimal? PreviousMonthKwh,
+        int? PeakUsageHour, decimal? PeakUsageHourAvgKwh);
+
+    /// <summary>Current-vs-previous calendar month total consumption (summed from real Daily Load
+    /// Profile rows), plus which hour-of-day tends to draw the most power across the last 30 days
+    /// of Load Survey data -- both real, derived aggregates, never invented. Previous month is
+    /// null (not zero) when this meter has no DLP history reaching back that far.</summary>
+    [HttpGet("{id:guid}/consumption/monthly-comparison")]
+    public async Task<IActionResult> GetMonthlyConsumptionComparison(Guid id, CancellationToken ct)
+    {
+        var meterId = await CurrentMeterIdAsync(id, ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentMonthStart = new DateOnly(today.Year, today.Month, 1);
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+        var currentLabel = currentMonthStart.ToString("MMMM yyyy");
+        var previousLabel = previousMonthStart.ToString("MMMM yyyy");
+
+        if (meterId is null)
+            return Ok(new MonthlyConsumptionComparison(currentLabel, 0, previousLabel, null, null, null));
+
+        var dlp = await _db.DailyLoadProfiles.Where(d => d.MeterId == meterId.Value).ToListAsync(ct);
+        var currentMonthKwh = dlp.Where(d => d.ProfileDate >= currentMonthStart && d.ProfileDate < currentMonthStart.AddMonths(1)).Sum(d => d.ConsumptionKwh);
+        var previousMonthRows = dlp.Where(d => d.ProfileDate >= previousMonthStart && d.ProfileDate < currentMonthStart).ToList();
+        decimal? previousMonthKwh = previousMonthRows.Count == 0 ? null : previousMonthRows.Sum(d => d.ConsumptionKwh);
+
+        var windowStartUtc = DateTime.UtcNow.AddDays(-30);
+        var lsRows = await _db.LoadSurveyIntervals
+            .Where(i => i.MeterId == meterId.Value && i.IntervalEndUtc >= windowStartUtc)
+            .ToListAsync(ct);
+        int? peakHour = null;
+        decimal? peakHourAvgKwh = null;
+        if (lsRows.Count > 0)
+        {
+            var byHour = lsRows.GroupBy(r => r.IntervalEndUtc.AddMinutes(-1).Hour)
+                .Select(g => new { Hour = g.Key, Avg = g.Average(r => r.ConsumptionKwh) })
+                .OrderByDescending(g => g.Avg)
+                .First();
+            peakHour = byHour.Hour;
+            peakHourAvgKwh = byHour.Avg;
+        }
+
+        return Ok(new MonthlyConsumptionComparison(currentLabel, currentMonthKwh, previousLabel, previousMonthKwh, peakHour, peakHourAvgKwh));
+    }
+
 
 
     public record BillingProfileRow(

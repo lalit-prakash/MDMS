@@ -105,7 +105,7 @@ class _HomeTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(summaryProvider);
-    final consumptionAsync = ref.watch(dailyConsumptionProvider);
+    final consumptionAsync = ref.watch(dailyConsumptionProvider(7));
     final meterAsync = ref.watch(meterOverviewProvider);
 
     final actions = [
@@ -118,7 +118,7 @@ class _HomeTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(summaryProvider);
-        ref.invalidate(dailyConsumptionProvider);
+        ref.invalidate(dailyConsumptionProvider(7));
         ref.invalidate(meterOverviewProvider);
       },
       child: ListView(
