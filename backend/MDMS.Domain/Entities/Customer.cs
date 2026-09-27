@@ -24,6 +24,19 @@ public class Customer : Entity
     /// </summary>
     public string? RrNumber { get; private set; }
     public string? MobileNumber { get; private set; }
+
+    /// <summary>Consumer mobile-app password, set via ConsumerAuthController's register/reset
+    /// flows (PBKDF2 hash, see PasswordHasher) â€” null until the consumer registers for password
+    /// login. Independent of mobile-number-based login, which always remains available.</summary>
+    public string? PasswordHash { get; private set; }
+
+    public void SetPasswordHash(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Password hash is required.", nameof(passwordHash));
+        PasswordHash = passwordHash;
+    }
+
     public string? ConnectionStatus { get; private set; }
     public DateOnly? ServiceDate { get; private set; }
     public decimal? SanctionedLoadKw { get; private set; }
@@ -40,7 +53,7 @@ public class Customer : Entity
     public decimal? Longitude { get; private set; }
 
     /// <summary>Meter-related consumer master fields from the Consumer sheet (meter make/phase/MF,
-    /// MR flag, satno, asset timestamp, replacement date) — set via <see cref="SetMeterAssetData"/>.</summary>
+    /// MR flag, satno, asset timestamp, replacement date) ï¿½ set via <see cref="SetMeterAssetData"/>.</summary>
     public string? MeterMake { get; private set; }
     public string? MeterPhase { get; private set; }
     public decimal? MultiplyingFactor { get; private set; }

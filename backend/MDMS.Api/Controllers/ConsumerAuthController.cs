@@ -2,6 +2,7 @@ using MDMS.Api.Tenancy;
 using MDMS.Application.Common;
 using MDMS.Application.Prepaid;
 using MDMS.Application.Security;
+using MDMS.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -77,6 +78,124 @@ public class ConsumerAuthController : ControllerBase
         var tenants = await _db.Tenants.IgnoreQueryFilters().Where(t => tenantIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
         return Ok(customers.Select(c => new LinkedAccountRow(c.AccountNumber, c.Name, tenants.GetValueOrDefault(c.TenantId, "Default Organisation"))).ToList());
+    }
+
+    /// <summary>
+    /// Fixed placeholder OTP used by the register/forgot-password flows below until a real
+    /// email/SMS provider is configured (this project has none -- see this controller's own doc
+    /// comment). Every request-otp response discloses this in <c>OtpDeliveryNote</c> so the app
+    /// can show the consumer the real state of affairs instead of pretending a code was sent.
+    /// Swap in a real IOtpSender + persisted, expiring challenge once SMTP/SMS is wired up.
+    /// </summary>
+    private const string DevPlaceholderOtp = "1234";
+    private const string DevOtpNote = "Development mode: no email/SMS provider is configured yet, so no code was actually sent. Use 1234 to continue.";
+
+    public record RequestOtpRequest(string AccountNumber, string MobileNumber);
+    public record RequestOtpResponse(bool Sent, string OtpDeliveryNote);
+
+    /// <summary>Shared identity check for both registration and password-reset OTP requests --
+    /// same real match (account number + mobile number on file) Login already uses.</summary>
+    private async Task<Customer?> VerifyIdentityAsync(string? accountNumber, string? mobileNumber, CancellationToken ct)
+    {
+        var acc = accountNumber?.Trim();
+        var mobile = mobileNumber?.Trim();
+        if (string.IsNullOrWhiteSpace(acc) || string.IsNullOrWhiteSpace(mobile)) return null;
+
+        var customer = await _db.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.AccountNumber == acc, ct);
+        return customer is not null && customer.MobileNumber == mobile ? customer : null;
+    }
+
+    [HttpPost("register/request-otp")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RequestRegisterOtp([FromBody] RequestOtpRequest request, CancellationToken ct)
+    {
+        var customer = await VerifyIdentityAsync(request.AccountNumber, request.MobileNumber, ct);
+        if (customer is null) return Unauthorized("Account number and mobile number do not match our records.");
+        if (customer.PasswordHash is not null) return Conflict("This account already has a password set. Use Login instead.");
+
+        return Ok(new RequestOtpResponse(true, DevOtpNote));
+    }
+
+    public record CompleteRegisterRequest(string AccountNumber, string MobileNumber, string Otp, string Password);
+
+    [HttpPost("register/complete")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CompleteRegister([FromBody] CompleteRegisterRequest request, CancellationToken ct)
+    {
+        var customer = await VerifyIdentityAsync(request.AccountNumber, request.MobileNumber, ct);
+        if (customer is null) return Unauthorized("Account number and mobile number do not match our records.");
+        if (customer.PasswordHash is not null) return Conflict("This account already has a password set. Use Login instead.");
+        if (request.Otp?.Trim() != DevPlaceholderOtp) return BadRequest("Incorrect verification code.");
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6) return BadRequest("Password must be at least 6 characters.");
+
+        customer.SetPasswordHash(PasswordHasher.Hash(request.Password));
+        await _db.SaveChangesAsync(ct);
+
+        var token = _tokens.CreateConsumerAccessToken(customer.Id, customer.Name, customer.TenantId);
+        return Ok(new ConsumerLoginResponse(token.Value, token.ExpiresAtUtc, customer.Id, customer.Name, customer.AccountNumber));
+    }
+
+    public record PasswordLoginRequest(string AccountNumber, string Password);
+
+    [HttpPost("password/login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> PasswordLogin([FromBody] PasswordLoginRequest request, CancellationToken ct)
+    {
+        var accountNumber = request.AccountNumber?.Trim();
+        if (string.IsNullOrWhiteSpace(accountNumber) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest("Account number and password are required.");
+
+        var customer = await _db.Customers.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.AccountNumber == accountNumber, ct);
+        if (customer?.PasswordHash is null || !PasswordHasher.Verify(customer.PasswordHash, request.Password))
+            return Unauthorized("Incorrect account number or password.");
+
+        var token = _tokens.CreateConsumerAccessToken(customer.Id, customer.Name, customer.TenantId);
+        return Ok(new ConsumerLoginResponse(token.Value, token.ExpiresAtUtc, customer.Id, customer.Name, customer.AccountNumber));
+    }
+
+    [HttpPost("password/forgot/request-otp")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RequestForgotPasswordOtp([FromBody] RequestOtpRequest request, CancellationToken ct)
+    {
+        var customer = await VerifyIdentityAsync(request.AccountNumber, request.MobileNumber, ct);
+        if (customer is null) return Unauthorized("Account number and mobile number do not match our records.");
+
+        return Ok(new RequestOtpResponse(true, DevOtpNote));
+    }
+
+    public record CompleteForgotPasswordRequest(string AccountNumber, string MobileNumber, string Otp, string NewPassword);
+
+    [HttpPost("password/forgot/complete")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CompleteForgotPassword([FromBody] CompleteForgotPasswordRequest request, CancellationToken ct)
+    {
+        var customer = await VerifyIdentityAsync(request.AccountNumber, request.MobileNumber, ct);
+        if (customer is null) return Unauthorized("Account number and mobile number do not match our records.");
+        if (request.Otp?.Trim() != DevPlaceholderOtp) return BadRequest("Incorrect verification code.");
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6) return BadRequest("Password must be at least 6 characters.");
+
+        customer.SetPasswordHash(PasswordHasher.Hash(request.NewPassword));
+        await _db.SaveChangesAsync(ct);
+        return Ok();
+    }
+
+    public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+    [HttpPost("password/change")]
+    [Authorize(Roles = "Consumer")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        var consumerId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (!Guid.TryParse(consumerId, out var id)) return Unauthorized();
+
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (customer?.PasswordHash is null || !PasswordHasher.Verify(customer.PasswordHash, request.CurrentPassword))
+            return Unauthorized("Current password is incorrect.");
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6) return BadRequest("Password must be at least 6 characters.");
+
+        customer.SetPasswordHash(PasswordHasher.Hash(request.NewPassword));
+        await _db.SaveChangesAsync(ct);
+        return Ok();
     }
 
     public record GuestRechargeRequest(string AccountNumber, string MobileNumber, decimal Amount, string Reference);

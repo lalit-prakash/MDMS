@@ -15,6 +15,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.Name).IsRequired().HasMaxLength(256);
         builder.Property(c => c.RrNumber).HasMaxLength(64);
         builder.Property(c => c.MobileNumber).HasMaxLength(32);
+        builder.Property(c => c.PasswordHash).HasMaxLength(256);
         builder.Property(c => c.ConnectionStatus).HasMaxLength(32);
         builder.Property(c => c.LoadType).HasMaxLength(32);
         builder.Property(c => c.TariffCategoryCode).HasMaxLength(32);
