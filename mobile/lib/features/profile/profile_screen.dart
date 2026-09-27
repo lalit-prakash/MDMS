@@ -25,15 +25,18 @@ class ProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Center(
-            child: CircleAvatar(
-              radius: 32,
-              backgroundImage: settings.profilePhotoPath != null ? FileImage(File(settings.profilePhotoPath!)) : null,
-              child: settings.profilePhotoPath == null
-                  ? Text(session != null && session.name.isNotEmpty ? session.name.substring(0, 1) : '?', style: const TextStyle(fontSize: 28))
-                  : null,
-            ),
-          ),
+          Builder(builder: (context) {
+            final hasPhoto = settings.profilePhotoPath != null && File(settings.profilePhotoPath!).existsSync();
+            return Center(
+              child: CircleAvatar(
+                radius: 32,
+                backgroundImage: hasPhoto ? FileImage(File(settings.profilePhotoPath!)) : null,
+                child: hasPhoto
+                    ? null
+                    : Text(session != null && session.name.isNotEmpty ? session.name.substring(0, 1) : '?', style: const TextStyle(fontSize: 28)),
+              ),
+            );
+          }),
           const SizedBox(height: 12),
           Center(child: Text(session?.name ?? '', style: Theme.of(context).textTheme.titleLarge)),
           Center(child: Text(session?.organisationName ?? '', style: Theme.of(context).textTheme.bodySmall)),
