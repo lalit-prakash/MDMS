@@ -28,7 +28,9 @@ class ProfileScreen extends ConsumerWidget {
             child: CircleAvatar(
               radius: 32,
               backgroundImage: settings.profilePhotoPath != null ? FileImage(File(settings.profilePhotoPath!)) : null,
-              child: settings.profilePhotoPath == null ? Text(session?.name.substring(0, 1) ?? '?', style: const TextStyle(fontSize: 28)) : null,
+              child: settings.profilePhotoPath == null
+                  ? Text(session != null && session.name.isNotEmpty ? session.name.substring(0, 1) : '?', style: const TextStyle(fontSize: 28))
+                  : null,
             ),
           ),
           const SizedBox(height: 12),
@@ -79,7 +81,22 @@ class ProfileScreen extends ConsumerWidget {
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onTap: () => ref.read(sessionListProvider.notifier).signOut(),
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Log out?'),
+                    content: linkedCount > 1
+                        ? Text('This will sign you out of all $linkedCount linked accounts on this device.')
+                        : const Text('You will need your account number and mobile number to sign in again.'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Logout')),
+                    ],
+                  ),
+                );
+                if (confirmed == true) await ref.read(sessionListProvider.notifier).signOut();
+              },
             ),
           ),
         ],
