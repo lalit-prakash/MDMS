@@ -158,8 +158,9 @@ class _RequestMeterTestScreenState extends ConsumerState<_RequestMeterTestScreen
           children: [
             DropdownButtonFormField<String>(
               initialValue: _reason,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Reason'),
-              items: _reasons.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+              items: _reasons.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (v) => setState(() => _reason = v!),
             ),
             const SizedBox(height: 16),

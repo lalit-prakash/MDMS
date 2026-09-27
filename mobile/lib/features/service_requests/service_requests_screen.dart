@@ -148,8 +148,9 @@ class _RaiseServiceRequestScreenState extends ConsumerState<_RaiseServiceRequest
           children: [
             DropdownButtonFormField<String>(
               initialValue: _category,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Category'),
-              items: _categories.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+              items: _categories.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (v) => setState(() => _category = v!),
             ),
             const SizedBox(height: 16),
