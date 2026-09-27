@@ -230,63 +230,126 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
     );
   }
 
+  /// For "today" (30-min Load Survey points), pairs are merged into hourly buckets purely for
+  /// chart legibility -- the Maximum/Minimum figures below still come from the real 30-min points,
+  /// never from this aggregated display series.
+  List<TrendPoint> _chartSeries(List<TrendPoint> spotSource, bool isInr) {
+    if (_range != _TrendRange.today) return spotSource;
+    final merged = <TrendPoint>[];
+    for (var i = 0; i < spotSource.length; i += 2) {
+      final chunk = spotSource.skip(i).take(2).toList();
+      final kwh = chunk.fold<double>(0, (a, p) => a + p.kwh);
+      final hasInr = chunk.every((p) => p.inr != null);
+      final inr = hasInr ? chunk.fold<double>(0, (a, p) => a + p.inr!) : null;
+      merged.add(TrendPoint.fromJson({'atUtc': chunk.last.atUtc.toIso8601String(), 'kwh': kwh, 'inr': inr}));
+    }
+    return merged;
+  }
+
   Widget _buildChart(List<TrendPoint> spotSource, bool isInr, double avg) {
     final dateFormat = _range == _TrendRange.today ? DateFormat.Hm() : DateFormat.MMMd();
-    final values = spotSource.map((p) => isInr ? p.inr! : p.kwh).toList();
-    final maxY = values.reduce((a, b) => a > b ? a : b) * 1.2;
+    final series = _chartSeries(spotSource, isInr);
+    final values = series.map((p) => isInr ? p.inr! : p.kwh).toList();
+    final maxY = values.reduce((a, b) => a > b ? a : b) * 1.25;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 180,
-          child: BarChart(
-            BarChartData(
-              maxY: maxY == 0 ? 1 : maxY,
-              gridData: const FlGridData(show: true, drawVerticalLine: false),
-              borderData: FlBorderData(show: false),
-              extraLinesData: ExtraLinesData(horizontalLines: [
-                HorizontalLine(y: avg, color: AppColors.cardMuted, strokeWidth: 1, dashArray: [6, 4]),
-              ]),
-              titlesData: FlTitlesData(
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: isInr ? 44 : 36)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 28,
-                    getTitlesWidget: (value, meta) {
-                      final i = value.toInt();
-                      if (i < 0 || i >= spotSource.length) return const SizedBox.shrink();
-                      final step = (spotSource.length / 6).ceil().clamp(1, spotSource.length);
-                      if (i % step != 0) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(dateFormat.format(spotSource[i].atUtc.toLocal()), style: const TextStyle(fontSize: 9)),
-                      );
-                    },
+        Container(
+          padding: const EdgeInsets.fromLTRB(4, 16, 12, 4),
+          decoration: BoxDecoration(color: AppColors.scaffoldBg.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(16)),
+          child: SizedBox(
+            height: 190,
+            child: BarChart(
+              BarChartData(
+                maxY: maxY == 0 ? 1 : maxY,
+                alignment: BarChartAlignment.spaceAround,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: maxY / 4 == 0 ? 1 : maxY / 4,
+                  getDrawingHorizontalLine: (_) => FlLine(color: AppColors.cardMuted.withValues(alpha: 0.12), strokeWidth: 1),
+                ),
+                borderData: FlBorderData(show: false),
+                extraLinesData: ExtraLinesData(horizontalLines: [
+                  HorizontalLine(
+                    y: avg,
+                    color: AppColors.warning,
+                    strokeWidth: 1.5,
+                    dashArray: [6, 4],
+                    label: HorizontalLineLabel(
+                      show: true,
+                      alignment: Alignment.topRight,
+                      style: const TextStyle(fontSize: 9, color: AppColors.warning, fontWeight: FontWeight.w600),
+                      labelResolver: (_) => 'avg',
+                    ),
+                  ),
+                ]),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isInr ? 44 : 32,
+                      getTitlesWidget: (value, meta) =>
+                          Text(value.toStringAsFixed(isInr ? 0 : 1), style: const TextStyle(fontSize: 9, color: AppColors.cardMuted)),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      getTitlesWidget: (value, meta) {
+                        final i = value.toInt();
+                        if (i < 0 || i >= series.length) return const SizedBox.shrink();
+                        final step = (series.length / 5).ceil().clamp(1, series.length);
+                        if (i % step != 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(dateFormat.format(series[i].atUtc.toLocal()), style: const TextStyle(fontSize: 9, color: AppColors.cardMuted)),
+                        );
+                      },
+                    ),
                   ),
                 ),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.accent,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+                      '${isInr ? _currency.format(rod.toY) : '${rod.toY.toStringAsFixed(2)} kWh'}\n${dateFormat.format(series[groupIndex].atUtc.toLocal())}',
+                      const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                barGroups: [
+                  for (var i = 0; i < series.length; i++)
+                    BarChartGroupData(x: i, barRods: [
+                      BarChartRodData(
+                        toY: values[i],
+                        width: series.length > 20 ? 6 : 14,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(series.length > 20 ? 2 : 5)),
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [AppColors.accent.withValues(alpha: 0.55), AppColors.heroGradientEnd],
+                        ),
+                      ),
+                    ]),
+                ],
               ),
-              barGroups: [
-                for (var i = 0; i < spotSource.length; i++)
-                  BarChartGroupData(x: i, barRods: [
-                    BarChartRodData(toY: values[i], color: AppColors.accent, width: 8, borderRadius: BorderRadius.circular(3)),
-                  ]),
-              ],
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
+            Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.heroGradientEnd, shape: BoxShape.circle)),
             const SizedBox(width: 6),
             const Text('Consumption', style: TextStyle(fontSize: 11, color: AppColors.cardMuted)),
             const SizedBox(width: 16),
-            Container(width: 14, height: 0, decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.cardMuted, width: 1)))),
+            Container(width: 14, height: 0, decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.warning, width: 1.5)))),
             const SizedBox(width: 6),
             const Text('Average', style: TextStyle(fontSize: 11, color: AppColors.cardMuted)),
           ],
