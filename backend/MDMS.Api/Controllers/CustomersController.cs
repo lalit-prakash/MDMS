@@ -682,7 +682,7 @@ public class CustomersController : ControllerBase
     /// figure, not the true instantaneous peak Instantaneous Profile would show at 15-minute
     /// cadence. Empty (not fabricated) when no Load Survey rows exist for that date.</summary>
     [HttpGet("{id:guid}/consumption/day-detail")]
-    public async Task<IActionResult> GetDayConsumptionDetail(Guid id, [FromQuery] DateOnly date, CancellationToken ct)
+    public async Task<IActionResult> GetDayConsumptionDetail(Guid id, [FromQuery] DateOnly date, [FromQuery] bool summaryOnly, CancellationToken ct)
     {
         var meterId = await CurrentMeterIdAsync(id, ct);
         if (meterId is null)
@@ -698,12 +698,17 @@ public class CustomersController : ControllerBase
         if (rows.Count == 0)
             return Ok(new DayConsumptionDetail(date, 0, null, null, null, null, null, [], []));
 
-        var intervals = rows.Select(r => new IntervalConsumptionPoint(r.IntervalStartUtc, r.IntervalEndUtc, r.ConsumptionKwh, r.AverageVoltage, r.AverageCurrent)).ToList();
-        var hourly = rows
-            .GroupBy(r => r.IntervalEndUtc.AddMinutes(-1).Hour)
-            .OrderBy(g => g.Key)
-            .Select(g => new HourlyConsumptionPoint(g.Key, g.Sum(r => r.ConsumptionKwh)))
-            .ToList();
+        // The Home dashboard's "Today's Peak Usage" tile only needs the four summary figures
+        // below, not the full interval/hourly series -- summaryOnly skips building those to keep
+        // that request light (this endpoint otherwise returns up to 48 intervals + 24 hourly
+        // points, all wasted on a single-number tile).
+        var intervals = summaryOnly ? [] : rows.Select(r => new IntervalConsumptionPoint(r.IntervalStartUtc, r.IntervalEndUtc, r.ConsumptionKwh, r.AverageVoltage, r.AverageCurrent)).ToList();
+        var hourly = summaryOnly
+            ? []
+            : rows.GroupBy(r => r.IntervalEndUtc.AddMinutes(-1).Hour)
+                .OrderBy(g => g.Key)
+                .Select(g => new HourlyConsumptionPoint(g.Key, g.Sum(r => r.ConsumptionKwh)))
+                .ToList();
 
         var totalKwh = rows.Sum(r => r.ConsumptionKwh);
         var peak = rows.MaxBy(r => r.ConsumptionKwh)!;

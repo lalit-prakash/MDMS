@@ -75,8 +75,10 @@ final _todayPeakProvider = FutureProvider.autoDispose<double?>((ref) async {
   final client = ref.watch(apiClientProvider);
   final session = ref.watch(sessionProvider)!;
   final today = DateTime.now();
-  final response = await apiCall(() => client.dio.get('/api/v1/customers/${session.consumerId}/consumption/day-detail',
-      queryParameters: {'date': '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}'}));
+  final response = await apiCall(() => client.dio.get('/api/v1/customers/${session.consumerId}/consumption/day-detail', queryParameters: {
+        'date': '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}',
+        'summaryOnly': true,
+      }));
   final data = response.data as Map<String, dynamic>;
   return (data['peakKw'] as num?)?.toDouble();
 });
@@ -186,7 +188,16 @@ class _AppDrawer extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircleAvatar(radius: 22, backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
+                  Builder(builder: (context) {
+                    final photoPath = ref.watch(appSettingsProvider).profilePhotoPath;
+                    final hasPhoto = photoPath != null && File(photoPath).existsSync();
+                    return CircleAvatar(
+                      radius: 22,
+                      backgroundColor: Colors.white24,
+                      backgroundImage: hasPhoto ? FileImage(File(photoPath)) : null,
+                      child: hasPhoto ? null : const Icon(Icons.person, color: Colors.white),
+                    );
+                  }),
                   const SizedBox(height: 8),
                   Text(session?.name ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                   summaryAsync.maybeWhen(
@@ -268,37 +279,41 @@ class _HomeTab extends ConsumerWidget {
                 builder: (context) => IconButton(
                   icon: const Icon(Icons.menu),
                   onPressed: () => Scaffold.of(context).openDrawer(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  visualDensity: VisualDensity.compact,
+                  splashRadius: 20,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               Consumer(
                 builder: (context, ref, _) {
                   final photoPath = ref.watch(appSettingsProvider).profilePhotoPath;
                   if (photoPath != null && File(photoPath).existsSync()) {
-                    return CircleAvatar(radius: 22, backgroundImage: FileImage(File(photoPath)));
+                    return CircleAvatar(radius: 20, backgroundImage: FileImage(File(photoPath)));
                   }
                   return summaryAsync.maybeWhen(
                     data: (s) => CircleAvatar(
-                      radius: 22,
+                      radius: 20,
                       backgroundColor: AppColors.accent,
-                      child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+                      child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
-                    orElse: () => const CircleAvatar(radius: 22, child: Icon(Icons.person)),
+                    orElse: () => const CircleAvatar(radius: 20, child: Icon(Icons.person)),
                   );
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     summaryAsync.when(
-                      data: (s) => Text('Hello, ${s.name}', style: Theme.of(context).textTheme.headlineSmall),
+                      data: (s) => Text('Hello, ${s.name}', style: Theme.of(context).textTheme.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
                       loading: () => const Text('Loading...'),
                       error: (e, _) => Text(e.toString(), style: const TextStyle(color: Colors.red)),
                     ),
                     summaryAsync.maybeWhen(
-                      data: (s) => Text('Consumer No: ${s.accountNumber}', style: const TextStyle(color: AppColors.cardMuted)),
+                      data: (s) => Text('Consumer No: ${s.accountNumber}', style: const TextStyle(color: AppColors.cardMuted, fontSize: 12)),
                       orElse: () => const SizedBox.shrink(),
                     ),
                   ],
@@ -310,6 +325,10 @@ class _HomeTab extends ConsumerWidget {
                   final count = alertsAsync.maybeWhen(data: (rows) => rows.length, orElse: () => 0);
                   return IconButton(
                     onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlertsScreen())),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    visualDensity: VisualDensity.compact,
+                    splashRadius: 20,
                     icon: Badge(
                       label: Text('$count'),
                       isLabelVisible: count > 0,
@@ -320,7 +339,7 @@ class _HomeTab extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           summaryAsync.when(
             data: (s) => HeroGradientCard(
               child: Column(
@@ -428,7 +447,7 @@ class _HomeTab extends ConsumerWidget {
             loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(color: Colors.white))),
             error: (e, _) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(e.toString(), style: const TextStyle(color: Colors.red)))),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -534,9 +553,9 @@ class _HomeTab extends ConsumerWidget {
             },
             orElse: () => const SizedBox.shrink(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           GridView.count(
             crossAxisCount: 4,
             shrinkWrap: true,
