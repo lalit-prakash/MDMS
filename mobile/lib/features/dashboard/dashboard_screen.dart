@@ -285,23 +285,6 @@ class _HomeTab extends ConsumerWidget {
                   splashRadius: 20,
                 ),
               ),
-              const SizedBox(width: 8),
-              Consumer(
-                builder: (context, ref, _) {
-                  final photoPath = ref.watch(appSettingsProvider).profilePhotoPath;
-                  if (photoPath != null && File(photoPath).existsSync()) {
-                    return CircleAvatar(radius: 20, backgroundImage: FileImage(File(photoPath)));
-                  }
-                  return summaryAsync.maybeWhen(
-                    data: (s) => CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.accent,
-                      child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                    ),
-                    orElse: () => const CircleAvatar(radius: 20, child: Icon(Icons.person)),
-                  );
-                },
-              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

@@ -5,6 +5,7 @@ import '../../core/app_settings.dart';
 import '../../core/biometrics.dart';
 import '../../core/mpin.dart';
 import '../mpin/mpin_setup_screen.dart';
+import 'change_password_screen.dart';
 
 /// Device-local settings: theme, notification toggles + low-balance threshold, profile photo.
 /// These are per-device preferences with no backend endpoint to sync them (this project has no
@@ -91,10 +92,11 @@ class SettingsScreen extends ConsumerWidget {
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.lock_outline, color: Theme.of(context).disabledColor),
-                  title: Text('Change Password', style: TextStyle(color: Theme.of(context).disabledColor)),
-                  subtitle: const Text('Not applicable — you sign in with your account number and registered mobile number, not a password.'),
-                  enabled: false,
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Change Password'),
+                  subtitle: const Text('Only if you have registered for password login'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
                 ),
                 Consumer(
                   builder: (context, ref, _) {
