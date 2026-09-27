@@ -320,8 +320,10 @@ class _HomeTab extends ConsumerWidget {
             error: (e, _) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(e.toString(), style: const TextStyle(color: Colors.red)))),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Expanded(
                 child: consumptionAsync.when(
                   data: (rows) {
@@ -355,7 +357,8 @@ class _HomeTab extends ConsumerWidget {
                   },
                 ),
               ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           meterAsync.maybeWhen(
