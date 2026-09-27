@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_settings.dart';
+import '../../core/mpin.dart';
+import '../mpin/mpin_setup_screen.dart';
 
 /// Device-local settings: theme, notification toggles + low-balance threshold, profile photo.
 /// These are per-device preferences with no backend endpoint to sync them (this project has no
@@ -92,6 +94,36 @@ class SettingsScreen extends ConsumerWidget {
                   title: Text('Change Password', style: TextStyle(color: Theme.of(context).disabledColor)),
                   subtitle: const Text('Not applicable — you sign in with your account number and registered mobile number, not a password.'),
                   enabled: false,
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final hasMpin = ref.watch(mpinControllerProvider);
+                    return ListTile(
+                      leading: const Icon(Icons.pin_outlined),
+                      title: Text(hasMpin ? 'Change MPIN' : 'Set MPIN'),
+                      subtitle: Text(hasMpin ? 'Quick-unlock this app without re-entering your account details' : 'Set a 4-digit PIN to unlock this app quickly'),
+                      trailing: hasMpin
+                          ? IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Remove MPIN?'),
+                                    content: const Text('You will need your account number and mobile number to unlock the app next time.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                                      TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Remove')),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true) await ref.read(mpinControllerProvider.notifier).clear();
+                              },
+                            )
+                          : const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MpinSetupScreen())),
+                    );
+                  },
                 ),
               ],
             ),

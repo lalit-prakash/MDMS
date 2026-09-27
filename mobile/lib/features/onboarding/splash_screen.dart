@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_settings.dart';
 import '../../core/app_theme.dart';
+import '../../core/mpin.dart';
 import '../../core/session.dart';
 import '../auth/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../mpin/mpin_unlock_screen.dart';
 import 'onboarding_screen.dart';
 
 /// App entry point. Waits for the real on-device session and settings to finish loading (never a
@@ -29,6 +31,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     await Future.wait([
       ref.read(sessionReadyProvider.future),
       ref.read(settingsReadyProvider.future),
+      ref.read(mpinReadyProvider.future),
     ]);
     // A splash that flashes for a few milliseconds reads as broken, not fast -- hold it for a
     // minimum, real perceived-loading duration rather than however long storage happened to take.
@@ -39,9 +42,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     final session = ref.read(sessionProvider);
     final onboardingSeen = ref.read(appSettingsProvider).onboardingSeen;
+    final hasMpin = ref.read(mpinControllerProvider);
 
     Widget next;
-    if (session != null) {
+    if (session != null && hasMpin) {
+      next = const MpinUnlockScreen();
+    } else if (session != null) {
       next = const DashboardScreen();
     } else if (!onboardingSeen) {
       next = const OnboardingScreen();
