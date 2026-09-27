@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
+import 'consumption_screen.dart';
 
 enum _TrendRange { today, days7, days30 }
 enum _TrendUnit { kwh, inr }
@@ -187,6 +188,13 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
           const SizedBox(height: 16),
           _buildMinMax(trend, isInr),
         ],
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ConsumptionScreen())),
+            child: const Text('View Consumption Details'),
+          ),
+        ),
       ],
     );
   }
