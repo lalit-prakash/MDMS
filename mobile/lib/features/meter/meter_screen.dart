@@ -83,9 +83,13 @@ class MeterScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Meter No: ${m.meterNumber}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          Expanded(
+                            child: Text('Meter No: ${m.meterNumber}',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
                           StatusPill(text: m.status, color: m.status == 'Installed' ? AppColors.success : AppColors.warning),
                         ],
                       ),
