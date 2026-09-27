@@ -88,18 +88,47 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = [const _HomeTab(), const ConsumptionScreen(), const MeterScreen(), const ServicesScreen(), const ProfileScreen()];
+    const items = [
+      (Icons.home_outlined, Icons.home, 'Home'),
+      (Icons.show_chart_outlined, Icons.show_chart, 'Consumption'),
+      (Icons.electric_meter_outlined, Icons.electric_meter, 'Meter'),
+      (Icons.grid_view_outlined, Icons.grid_view, 'Services'),
+      (Icons.person_outline, Icons.person, 'Profile'),
+    ];
     return Scaffold(
       body: SafeArea(child: tabs[_tab]),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.show_chart_outlined), selectedIcon: Icon(Icons.show_chart), label: 'Consumption'),
-          NavigationDestination(icon: Icon(Icons.electric_meter_outlined), selectedIcon: Icon(Icons.electric_meter), label: 'Meter'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Services'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
-        ],
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.borderLight)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              children: [
+                for (var i = 0; i < items.length; i++)
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _tab = i),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(i == _tab ? items[i].$2 : items[i].$1, size: 22, color: i == _tab ? AppColors.primary : AppColors.textTertiary),
+                          const SizedBox(height: 3),
+                          Text(
+                            items[i].$3,
+                            style: TextStyle(fontSize: 11, fontWeight: i == _tab ? FontWeight.w600 : FontWeight.w500, color: i == _tab ? AppColors.primary : AppColors.textTertiary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -125,7 +154,6 @@ class _HomeTab extends ConsumerWidget {
     final actions = [
       _QuickAction('Recharge', Icons.bolt, const Color(0xFF7C4DFF), (_) => const RechargeScreen()),
       _QuickAction('Consumption', Icons.show_chart, const Color(0xFF00BFA5), (_) => const ConsumptionScreen()),
-      _QuickAction('Meter', Icons.electric_meter_outlined, const Color(0xFFFF8F00), (_) => const MeterScreen()),
       _QuickAction('Meter Testing', Icons.fact_check_outlined, const Color(0xFF3F51B5), (_) => const MeterTestingScreen()),
       _QuickAction('Complaint', Icons.support_agent_outlined, const Color(0xFFE91E63), (_) => const ComplaintsScreen()),
     ];

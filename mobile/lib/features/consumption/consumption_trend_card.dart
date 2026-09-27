@@ -188,8 +188,7 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
           const SizedBox(height: 16),
           _buildMinMax(trend, isInr),
         ],
-        Align(
-          alignment: Alignment.centerRight,
+        Center(
           child: TextButton(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ConsumptionScreen())),
             child: const Text('View Consumption Details'),
@@ -214,6 +213,7 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
               value: formatValue(isInr ? maxPoint.inr! : maxPoint.kwh),
               subtitle: dateFormat.format(maxPoint.atUtc.toLocal()),
               icon: Icons.trending_up,
+              iconColor: AppColors.warning,
             ),
           ),
         if (maxPoint != null && minPoint != null) const SizedBox(width: 12),
@@ -224,6 +224,7 @@ class _ConsumptionTrendCardState extends ConsumerState<ConsumptionTrendCard> {
               value: formatValue(isInr ? minPoint.inr! : minPoint.kwh),
               subtitle: dateFormat.format(minPoint.atUtc.toLocal()),
               icon: Icons.trending_down,
+              iconColor: AppColors.success,
             ),
           ),
       ],
