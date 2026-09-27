@@ -153,8 +153,9 @@ class _RaiseComplaintScreenState extends ConsumerState<_RaiseComplaintScreen> {
           children: [
             DropdownButtonFormField<String>(
               initialValue: _category,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (v) => setState(() => _category = v!),
             ),
             const SizedBox(height: 16),
