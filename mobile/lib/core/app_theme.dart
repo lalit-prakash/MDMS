@@ -272,6 +272,7 @@ class StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = iconColor ?? AppColors.primary;
+    final textTheme = Theme.of(context).textTheme;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -286,12 +287,18 @@ class StatTile extends StatelessWidget {
               child: Icon(icon, color: color, size: 17),
             ),
             const SizedBox(height: 8),
-            Text(label, style: AppTypography.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(label, style: textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontFamily: 'Roboto', fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(value,
+                style: textTheme.bodyLarge?.copyWith(fontSize: 17, fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
-              Text(subtitle!, style: TextStyle(fontFamily: 'Roboto', fontSize: 10, color: subtitleColor ?? AppColors.textTertiary), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(subtitle!,
+                  style: TextStyle(fontFamily: 'Roboto', fontSize: 10, color: subtitleColor ?? textTheme.bodySmall?.color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
             ],
           ],
         ),
