@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,10 +52,15 @@ class ConsumerSession {
 class SessionController extends StateNotifier<List<ConsumerSession>> {
   static const _storage = FlutterSecureStorage();
   int _activeIndex = 0;
+  final _readyCompleter = Completer<void>();
 
   SessionController() : super(const []) {
     _restore();
   }
+
+  /// Resolves once the on-device session has been read (or found empty) -- used by the splash
+  /// screen so it can wait for the real signed-in state instead of guessing a fixed delay.
+  Future<void> get ready => _readyCompleter.future;
 
   ConsumerSession? get active => state.isEmpty ? null : state[_activeIndex.clamp(0, state.length - 1)];
   int get activeIndex => _activeIndex;
@@ -67,6 +73,7 @@ class SessionController extends StateNotifier<List<ConsumerSession>> {
       _activeIndex = int.tryParse(activeRaw ?? '0') ?? 0;
       state = list;
     }
+    if (!_readyCompleter.isCompleted) _readyCompleter.complete();
   }
 
   Future<void> _persist() async {
@@ -120,6 +127,10 @@ class SessionController extends StateNotifier<List<ConsumerSession>> {
 }
 
 final sessionListProvider = StateNotifierProvider<SessionController, List<ConsumerSession>>((ref) => SessionController());
+
+/// Resolves once the on-device session has finished loading -- the splash screen awaits this
+/// instead of guessing a fixed delay before deciding whether to route to Login or the Dashboard.
+final sessionReadyProvider = FutureProvider<void>((ref) => ref.watch(sessionListProvider.notifier).ready);
 
 /// The currently active account's session, or null when signed out — the same shape every screen
 /// used before multi-account support existed.

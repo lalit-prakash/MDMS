@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_settings.dart';
 import '../../core/session.dart';
+import '../auth/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../settings/settings_screen.dart';
 import 'linked_accounts_screen.dart';
@@ -95,7 +96,11 @@ class ProfileScreen extends ConsumerWidget {
                     ],
                   ),
                 );
-                if (confirmed == true) await ref.read(sessionListProvider.notifier).signOut();
+                if (confirmed != true) return;
+                await ref.read(sessionListProvider.notifier).signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+                }
               },
             ),
           ),

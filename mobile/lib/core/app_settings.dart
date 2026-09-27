@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ class AppSettings {
   final double lowBalanceThreshold;
   final bool consumptionAlertsEnabled;
   final String? profilePhotoPath;
+  final bool onboardingSeen;
 
   const AppSettings({
     this.themeMode = ThemeMode.system,
@@ -19,6 +21,7 @@ class AppSettings {
     this.lowBalanceThreshold = 200,
     this.consumptionAlertsEnabled = true,
     this.profilePhotoPath,
+    this.onboardingSeen = false,
   });
 
   AppSettings copyWith({
@@ -27,6 +30,7 @@ class AppSettings {
     double? lowBalanceThreshold,
     bool? consumptionAlertsEnabled,
     String? profilePhotoPath,
+    bool? onboardingSeen,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -34,10 +38,14 @@ class AppSettings {
         lowBalanceThreshold: lowBalanceThreshold ?? this.lowBalanceThreshold,
         consumptionAlertsEnabled: consumptionAlertsEnabled ?? this.consumptionAlertsEnabled,
         profilePhotoPath: profilePhotoPath ?? this.profilePhotoPath,
+        onboardingSeen: onboardingSeen ?? this.onboardingSeen,
       );
 }
 
 class AppSettingsController extends StateNotifier<AppSettings> {
+  final _readyCompleter = Completer<void>();
+  Future<void> get ready => _readyCompleter.future;
+
   AppSettingsController() : super(const AppSettings()) {
     _restore();
   }
@@ -50,7 +58,14 @@ class AppSettingsController extends StateNotifier<AppSettings> {
       lowBalanceThreshold: prefs.getDouble('lowBalanceThreshold') ?? 200,
       consumptionAlertsEnabled: prefs.getBool('consumptionAlertsEnabled') ?? true,
       profilePhotoPath: prefs.getString('profilePhotoPath'),
+      onboardingSeen: prefs.getBool('onboardingSeen') ?? false,
     );
+    if (!_readyCompleter.isCompleted) _readyCompleter.complete();
+  }
+
+  Future<void> markOnboardingSeen() async {
+    state = state.copyWith(onboardingSeen: true);
+    (await SharedPreferences.getInstance()).setBool('onboardingSeen', true);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -85,3 +100,7 @@ class AppSettingsController extends StateNotifier<AppSettings> {
 }
 
 final appSettingsProvider = StateNotifierProvider<AppSettingsController, AppSettings>((ref) => AppSettingsController());
+
+/// Resolves once device-local settings have finished loading -- awaited by the splash screen
+/// alongside sessionReadyProvider before it decides where to route.
+final settingsReadyProvider = FutureProvider<void>((ref) => ref.watch(appSettingsProvider.notifier).ready);
