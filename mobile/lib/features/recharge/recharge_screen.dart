@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
 import '../dashboard/dashboard_screen.dart';
+import 'transaction_history_screen.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 const _presetAmounts = [100, 200, 500, 1000, 2000];
@@ -181,13 +182,23 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
             child: _submitting ? const CircularProgressIndicator(strokeWidth: 2) : const Text('RECHARGE NOW'),
           ),
           const SizedBox(height: 24),
-          Text('Recent Transactions', style: Theme.of(context).textTheme.titleMedium),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Recent Transactions', style: Theme.of(context).textTheme.titleMedium),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TransactionHistoryScreen())),
+                child: const Text('Filter & Download'),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           txAsync.when(
             data: (rows) => rows.isEmpty
                 ? const Padding(padding: EdgeInsets.all(16), child: Text('No transactions yet.'))
                 : Column(
                     children: rows
+                        .take(10)
                         .map((t) => Card(
                               child: ListTile(
                                 leading: Icon(t.amount >= 0 ? Icons.arrow_downward : Icons.arrow_upward,
