@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/app_settings.dart';
+import '../../core/biometrics.dart';
 import '../../core/mpin.dart';
 import '../mpin/mpin_setup_screen.dart';
 
@@ -117,11 +118,40 @@ class SettingsScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 );
-                                if (confirmed == true) await ref.read(mpinControllerProvider.notifier).clear();
+                                if (confirmed == true) {
+                                  await ref.read(mpinControllerProvider.notifier).clear();
+                                  await ref.read(biometricEnabledProvider.notifier).setEnabled(false);
+                                }
                               },
                             )
                           : const Icon(Icons.chevron_right),
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MpinSetupScreen())),
+                    );
+                  },
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final hasMpin = ref.watch(mpinControllerProvider);
+                    final biometricEnabled = ref.watch(biometricEnabledProvider);
+                    if (!hasMpin) return const SizedBox.shrink();
+                    return FutureBuilder<bool>(
+                      future: BiometricService.isDeviceSupported(),
+                      builder: (context, snapshot) {
+                        if (snapshot.data != true) return const SizedBox.shrink();
+                        return SwitchListTile(
+                          secondary: const Icon(Icons.fingerprint),
+                          title: const Text('Biometric Unlock'),
+                          subtitle: const Text('Use fingerprint or face unlock instead of your MPIN'),
+                          value: biometricEnabled,
+                          onChanged: (v) async {
+                            if (v) {
+                              final ok = await BiometricService.authenticate();
+                              if (!ok) return;
+                            }
+                            await ref.read(biometricEnabledProvider.notifier).setEnabled(v);
+                          },
+                        );
+                      },
                     );
                   },
                 ),

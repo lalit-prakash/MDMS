@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
+import '../../core/biometrics.dart';
 import '../../core/mpin.dart';
 import '../../core/session.dart';
 import '../auth/login_screen.dart';
@@ -20,6 +21,21 @@ class _MpinUnlockScreenState extends ConsumerState<MpinUnlockScreen> {
   String _entry = '';
   String? _error;
   bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometricIfEnabled());
+  }
+
+  Future<void> _tryBiometricIfEnabled() async {
+    if (!ref.read(biometricEnabledProvider)) return;
+    final ok = await BiometricService.authenticate();
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen()));
+    }
+  }
 
   void _onDigit(String d) {
     if (_entry.length >= 4 || _checking) return;
@@ -92,7 +108,13 @@ class _MpinUnlockScreenState extends ConsumerState<MpinUnlockScreen> {
               ],
               const Spacer(),
               _MpinKeypad(onDigit: _onDigit, onBackspace: _onBackspace),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              if (ref.watch(biometricEnabledProvider))
+                TextButton.icon(
+                  onPressed: _tryBiometricIfEnabled,
+                  icon: const Icon(Icons.fingerprint),
+                  label: const Text('Use biometric unlock'),
+                ),
               TextButton(onPressed: _useAccountLoginInstead, child: const Text('Use account number instead')),
             ],
           ),
