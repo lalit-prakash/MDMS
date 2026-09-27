@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
 import 'power_quality_screen.dart';
+import 'power_connection_screen.dart';
 import 'interval_profile_screen.dart';
 
 class MeterOverview {
@@ -122,6 +123,15 @@ class MeterScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PowerConnectionScreen())),
+                    icon: const Icon(Icons.power_settings_new_outlined),
+                    label: const Text('Power & Connection History'),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text('Latest Available Profile', style: Theme.of(context).textTheme.titleMedium),

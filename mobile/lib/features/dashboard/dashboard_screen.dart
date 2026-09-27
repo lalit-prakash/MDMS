@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/app_settings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers.dart';
 import '../../core/session.dart';
@@ -170,13 +172,21 @@ class _HomeTab extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              summaryAsync.maybeWhen(
-                data: (s) => CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.accent,
-                  child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
-                ),
-                orElse: () => const CircleAvatar(radius: 22, child: Icon(Icons.person)),
+              Consumer(
+                builder: (context, ref, _) {
+                  final photoPath = ref.watch(appSettingsProvider).profilePhotoPath;
+                  if (photoPath != null && File(photoPath).existsSync()) {
+                    return CircleAvatar(radius: 22, backgroundImage: FileImage(File(photoPath)));
+                  }
+                  return summaryAsync.maybeWhen(
+                    data: (s) => CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppColors.accent,
+                      child: Text(s.name.isNotEmpty ? s.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+                    ),
+                    orElse: () => const CircleAvatar(radius: 22, child: Icon(Icons.person)),
+                  );
+                },
               ),
               const SizedBox(width: 12),
               Expanded(

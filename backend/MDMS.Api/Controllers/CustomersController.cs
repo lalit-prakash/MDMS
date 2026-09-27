@@ -859,6 +859,83 @@ public class CustomersController : ControllerBase
             issues.Count == 0 ? "NORMAL" : "ALERT", issues));
     }
 
+    public record PowerOutageEvent(DateTime FailureAtUtc, DateTime? RestoredAtUtc, int? DurationMinutes);
+    public record ConnectionStatusEvent(string Type, DateTime AtUtc, string? Description);
+    public record PowerConnectionHistory(
+        bool? IsConnected, string? LoadLimitState,
+        IReadOnlyList<PowerOutageEvent> Outages,
+        IReadOnlyList<ConnectionStatusEvent> ConnectionEvents);
+
+    /// <summary>
+    /// Power outage history (real PowerFailure/PowerRestore MeterEvents, paired chronologically --
+    /// an unpaired trailing failure means the outage is still ongoing, never assumed resolved) plus
+    /// disconnection/reconnection history derived from real consecutive change in the meter's own
+    /// Instantaneous Profile LoadLimitState (Normal/Limited/Disconnected) -- this project has no
+    /// separate connect/disconnect audit log, so a state transition between two real readings *is*
+    /// the event, not an invented one. Current live IsConnected (prepaid wallet account status) and
+    /// LoadLimitState are included so the screen doesn't need a second round trip.
+    /// </summary>
+    [HttpGet("{id:guid}/power-connection-history")]
+    public async Task<IActionResult> GetPowerConnectionHistory(Guid id, CancellationToken ct)
+    {
+        var meterId = await CurrentMeterIdAsync(id, ct);
+        var account = await _db.PrepaidAccounts.FirstOrDefaultAsync(a => a.CustomerId == id, ct);
+        if (meterId is null)
+            return Ok(new PowerConnectionHistory(account?.IsConnected, null, [], []));
+
+        var powerEvents = await _db.MeterEvents
+            .Where(e => e.MeterId == meterId.Value && (e.EventType == Domain.Enums.MeterEventType.PowerFailure || e.EventType == Domain.Enums.MeterEventType.PowerRestore))
+            .OrderBy(e => e.OccurredAtUtc)
+            .ToListAsync(ct);
+
+        var outages = new List<PowerOutageEvent>();
+        DateTime? pendingFailure = null;
+        foreach (var e in powerEvents)
+        {
+            if (e.EventType == Domain.Enums.MeterEventType.PowerFailure)
+            {
+                if (pendingFailure is not null) outages.Add(new PowerOutageEvent(pendingFailure.Value, null, null));
+                pendingFailure = e.OccurredAtUtc;
+            }
+            else if (pendingFailure is not null)
+            {
+                outages.Add(new PowerOutageEvent(pendingFailure.Value, e.OccurredAtUtc, (int)(e.OccurredAtUtc - pendingFailure.Value).TotalMinutes));
+                pendingFailure = null;
+            }
+        }
+        if (pendingFailure is not null) outages.Add(new PowerOutageEvent(pendingFailure.Value, null, null));
+        outages.Reverse();
+
+        var ipRows = await _db.InstantaneousProfiles
+            .Where(i => i.MeterId == meterId.Value)
+            .OrderBy(i => i.MeterTimeUtc)
+            .Select(i => new { i.MeterTimeUtc, i.LoadLimitState })
+            .ToListAsync(ct);
+
+        var connectionEvents = new List<ConnectionStatusEvent>();
+        Domain.Enums.LoadLimitState? previous = null;
+        foreach (var row in ipRows)
+        {
+            if (previous is not null && row.LoadLimitState != previous)
+            {
+                var description = row.LoadLimitState switch
+                {
+                    Domain.Enums.LoadLimitState.Disconnected => "Meter reported disconnected",
+                    Domain.Enums.LoadLimitState.Limited => "Load limit applied",
+                    Domain.Enums.LoadLimitState.Normal => "Reconnected / load limit cleared",
+                    _ => null,
+                };
+                connectionEvents.Add(new ConnectionStatusEvent(row.LoadLimitState.ToString(), row.MeterTimeUtc, description));
+            }
+            previous = row.LoadLimitState;
+        }
+        connectionEvents.Reverse();
+
+        var latestLoadLimitState = ipRows.Count > 0 ? ipRows[^1].LoadLimitState.ToString() : null;
+
+        return Ok(new PowerConnectionHistory(account?.IsConnected, latestLoadLimitState, outages.Take(20).ToList(), connectionEvents.Take(20).ToList()));
+    }
+
     public record AlertRow(string Category, string Severity, string Title, string Message, DateTime AtUtc);
 
     /// <summary>
